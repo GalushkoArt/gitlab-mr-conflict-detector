@@ -1,0 +1,71 @@
+# CI/CD optimized configuration
+
+gitlab:
+  # Use environment variables in CI/CD
+  url: ${GITLAB_URL}
+  token: ${GITLAB_TOKEN}
+  projectId: ${CI_PROJECT_ID}
+  
+  # Shorter timeout for CI/CD environments
+  timeoutSeconds: 15
+
+detection:
+  # Always fetch in CI/CD to ensure latest state
+  fetchBeforeDetection: true
+  
+  # Use normal sensitivity for CI/CD
+  sensitivity: NORMAL
+  
+  # Limit conflict sections for faster processing
+  maxConflictSections: 50
+
+fileFilter:
+  # Focus on source code files only in CI/CD
+  includePatterns:
+    - "**/*.java"
+    - "**/*.kt"
+    - "**/*.js"
+    - "**/*.ts"
+    - "**/*.py"
+    - "**/*.go"
+    - "**/*.rs"
+    - "**/*.cpp"
+    - "**/*.c"
+    - "**/*.cs"
+    - "**/*.php"
+    - "**/*.rb"
+    - "**/*.scala"
+    - "**/*.sql"
+    - "**/*.xml"
+    - "**/*.json"
+    - "**/*.yaml"
+    - "**/*.yml"
+    - "**/Dockerfile"
+    - "**/*.gradle"
+    - "**/*.gradle.kts"
+    - "**/pom.xml"
+    - "**/package.json"
+  
+  # Aggressive exclusions for CI/CD performance
+  excludePatterns:
+    - "**/.git/**"
+    - "**/target/**"
+    - "**/build/**"
+    - "**/dist/**"
+    - "**/node_modules/**"
+    - "**/.gradle/**"
+    - "**/__pycache__/**"
+    - "**/*.class"
+    - "**/*.jar"
+    - "**/*.log"
+    - "**/.idea/**"
+    - "**/.vscode/**"
+    - "**/.DS_Store"
+    - "**/Thumbs.db"
+  
+  # Smaller file size limit for CI/CD
+  maxFileSizeBytes: 5242880  # 5MB
+
+# Never force pass in CI/CD unless explicitly set
+forcePass: false
+
