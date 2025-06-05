@@ -1,6 +1,5 @@
 package art.galushko.gitlab.mrconflict.gitlab;
 
-import art.galushko.gitlab.mrconflict.model.MergeResult;
 import org.gitlab4j.api.models.Branch;
 import org.gitlab4j.api.models.MergeRequest;
 import org.gitlab4j.api.models.Project;
@@ -88,18 +87,7 @@ public interface GitLabClient {
      * @throws GitLabException if merge request cannot be retrieved
      */
     MergeRequest getMergeRequest(Long projectId, Long mergeRequestIid) throws GitLabException;
-    
-    /**
-     * Creates a note (comment) on a merge request with conflict detection results.
-     *
-     * @param projectId GitLab project ID
-     * @param mergeRequestIid merge request internal ID
-     * @param mergeResults list of merge results to report
-     * @throws GitLabException if note cannot be created
-     */
-    void createConflictNote(Long projectId, Long mergeRequestIid, List<MergeResult> mergeResults) 
-            throws GitLabException;
-    
+
     /**
      * Updates the merge request status based on conflict detection results.
      *
