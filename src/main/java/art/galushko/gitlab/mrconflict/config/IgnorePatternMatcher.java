@@ -22,58 +22,65 @@ public class IgnorePatternMatcher implements PatternMatcher {
     }
 
     /**
-     * Checks if a file path matches any of the ignored patterns.
+     * Checks if a file path matches the given pattern.
      *
+     * @param pattern the pattern to match against
      * @param filePath the file path to check
-     * @return true if the file should be ignored
+     * @return true if the file path matches the pattern
      */
+    @Override
     public boolean matches(String pattern, String filePath) {
+        // Handle null or empty inputs
         if (filePath == null || filePath.isEmpty() || pattern == null || pattern.isEmpty()) {
             return false;
         }
 
-        String normalizedPath = normalizeFilePath(filePath);
-        String normalizedPattern = normalizePattern(pattern);
+        // Normalize paths for consistency
+        String normalizedPath = normalizePath(filePath);
+        String normalizedPattern = normalizePath(pattern);
 
-        // Handle simple directory patterns like "temp/"
-        if (normalizedPattern.endsWith("/")) {
-            return normalizedPath.startsWith(normalizedPattern) ||
-                    normalizedPath.equals(normalizedPattern.substring(0, normalizedPattern.length() - 1));
+        // For case-insensitive matching, convert to lowercase
+        if (!caseSensitive) {
+            normalizedPath = normalizedPath.toLowerCase();
+            normalizedPattern = normalizedPattern.toLowerCase();
         }
 
-        // Handle exact file matches
+        // Handle directory patterns (ending with /)
+        if (pattern.endsWith("/")) {
+            String dirPattern = normalizedPattern.substring(0, normalizedPattern.length() - 1);
+            return normalizedPath.equals(dirPattern) || normalizedPath.startsWith(dirPattern + "/");
+        }
+
+        // Handle exact matches
         if (normalizedPath.equals(normalizedPattern)) {
             return true;
         }
 
         // Handle glob patterns
         try {
-            PathMatcher matcher = FileSystems.getDefault().getPathMatcher("glob:" + normalizedPattern);
-            Path path = Path.of(normalizedPath);
+            // Create a glob pattern matcher
+            String globPattern = "glob:" + normalizedPattern;
+            PathMatcher matcher = FileSystems.getDefault().getPathMatcher(globPattern);
 
-            // Try direct match
-            if (matcher.matches(path)) {
-                return true;
-            }
-
-            // Try with different path variations for better compatibility
-            String[] pathVariations = {
-                    normalizedPath,
-                    "/" + normalizedPath,
-                    normalizedPath.replace("/", "\\"),
-                    "\\" + normalizedPath.replace("/", "\\")
-            };
-
-            for (String variation : pathVariations) {
-                try {
-                    if (matcher.matches(Path.of(variation))) {
-                        return true;
-                    }
-                } catch (Exception e) {
-                    // Ignore and try next variation
+            // Try to match the path
+            try {
+                Path path = Path.of(normalizedPath);
+                if (matcher.matches(path)) {
+                    return true;
                 }
+            } catch (Exception e) {
+                // Ignore invalid paths
             }
 
+            // Try with a leading slash
+            try {
+                Path path = Path.of("/" + normalizedPath);
+                if (matcher.matches(path)) {
+                    return true;
+                }
+            } catch (Exception e) {
+                // Ignore invalid paths
+            }
         } catch (Exception e) {
             log.debug("Error matching path '{}' against pattern '{}': {}", filePath, pattern, e.getMessage());
         }
@@ -82,41 +89,17 @@ public class IgnorePatternMatcher implements PatternMatcher {
     }
 
     /**
-     * Normalizes an ignore pattern for consistent matching.
+     * Normalizes a path for consistent matching.
      */
-    private String normalizePattern(String pattern) {
-        if (!caseSensitive) {
-            pattern = pattern.toLowerCase();
-        }
-
-        // Ensure pattern uses forward slashes for consistency
-        pattern = pattern.replace('\\', '/');
-
-        // Handle directory patterns - ensure they match subdirectories too
-        if (pattern.endsWith("/")) {
-            // Convert "temp/" to "temp/**" to match all files in the directory
-            pattern = pattern.substring(0, pattern.length() - 1) + "/**";
-        }
-
-        return pattern;
-    }
-
-    /**
-     * Normalizes a file path for consistent matching.
-     */
-    private String normalizeFilePath(String filePath) {
-        if (!caseSensitive) {
-            filePath = filePath.toLowerCase();
-        }
-
+    private String normalizePath(String path) {
         // Ensure path uses forward slashes for consistency
-        filePath = filePath.replace('\\', '/');
+        path = path.replace('\\', '/');
 
         // Remove leading slash if present
-        if (filePath.startsWith("/")) {
-            filePath = filePath.substring(1);
+        if (path.startsWith("/")) {
+            path = path.substring(1);
         }
 
-        return filePath;
+        return path;
     }
 }

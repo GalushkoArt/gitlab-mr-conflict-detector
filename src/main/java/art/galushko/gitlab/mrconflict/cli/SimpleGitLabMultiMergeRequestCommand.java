@@ -9,6 +9,7 @@ import picocli.CommandLine;
 
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.Callable;
 
 /**
  * Simplified command for multi-MR conflict detection with GitLab integration.
@@ -20,7 +21,7 @@ import java.util.Set;
         mixinStandardHelpOptions = true,
         version = "1.1.0"
 )
-public class SimpleGitLabMultiMergeRequestCommand implements Runnable {
+public class SimpleGitLabMultiMergeRequestCommand implements Callable<Integer> {
 
     private final ConflictAnalysisService conflictAnalysisService;
 
@@ -89,7 +90,7 @@ public class SimpleGitLabMultiMergeRequestCommand implements Runnable {
     }
 
     @Override
-    public void run() {
+    public Integer call() {
         try {
             configureLogging(verbose);
 
@@ -112,7 +113,7 @@ public class SimpleGitLabMultiMergeRequestCommand implements Runnable {
             if (mergeRequests.isEmpty()) {
                 log.info("No merge requests found for analysis");
                 System.out.println("No merge requests found for conflict analysis.");
-                System.exit(EXIT_SUCCESS);
+                return EXIT_SUCCESS;
             }
 
             log.info("Found {} merge requests for analysis", mergeRequests.size());
@@ -141,13 +142,12 @@ public class SimpleGitLabMultiMergeRequestCommand implements Runnable {
             }
 
             // Determine exit code
-            int exitCode = conflicts.isEmpty() ? EXIT_SUCCESS : EXIT_CONFLICTS_DETECTED;
-            System.exit(exitCode);
+            return conflicts.isEmpty() ? EXIT_SUCCESS : EXIT_CONFLICTS_DETECTED;
 
         } catch (Exception e) {
             log.error("Application failed", e);
             System.err.println("Error: " + e.getMessage());
-            System.exit(EXIT_ERROR);
+            return EXIT_ERROR;
         }
     }
 
