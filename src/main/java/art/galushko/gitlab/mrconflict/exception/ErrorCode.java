@@ -1,8 +1,11 @@
 package art.galushko.gitlab.mrconflict.exception;
 
+import lombok.Getter;
+
 /**
  * Enum of error codes for the application.
  */
+@Getter
 public enum ErrorCode {
     // Success
     SUCCESS(0, "Operation completed successfully"),
@@ -26,7 +29,7 @@ public enum ErrorCode {
     
     // File system errors
     FILE_SYSTEM_ERROR(40, "File system error");
-    
+
     private final int exitCode;
     private final String message;
     
@@ -40,25 +43,7 @@ public enum ErrorCode {
         this.exitCode = exitCode;
         this.message = message;
     }
-    
-    /**
-     * Gets the exit code.
-     *
-     * @return the exit code
-     */
-    public int getExitCode() {
-        return exitCode;
-    }
-    
-    /**
-     * Gets the error message.
-     *
-     * @return the error message
-     */
-    public String getMessage() {
-        return message;
-    }
-    
+
     /**
      * Gets a formatted error message with the error code.
      *

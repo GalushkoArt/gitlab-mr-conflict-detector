@@ -4,6 +4,8 @@ import art.galushko.gitlab.mrconflict.core.ConflictAnalysisService;
 import art.galushko.gitlab.mrconflict.gitlab.GitLabException;
 import art.galushko.gitlab.mrconflict.model.MergeRequestConflict;
 import art.galushko.gitlab.mrconflict.model.MergeRequestInfo;
+import art.galushko.gitlab.mrconflict.security.CredentialService;
+import art.galushko.gitlab.mrconflict.security.InputValidator;
 import lombok.extern.slf4j.Slf4j;
 import picocli.CommandLine;
 
@@ -24,18 +26,20 @@ import java.util.concurrent.Callable;
 public class SimpleGitLabMultiMergeRequestCommand implements Callable<Integer> {
 
     private final ConflictAnalysisService conflictAnalysisService;
+    private final CredentialService credentialService;
+    private final InputValidator inputValidator;
 
     @CommandLine.Option(
             names = {"--gitlab-url"},
-            description = "GitLab instance URL",
-            required = true
+            description = "GitLab instance URL (can also be set via GITLAB_URL environment variable)",
+            required = false
     )
     private String gitlabUrl;
 
     @CommandLine.Option(
             names = {"--gitlab-token"},
-            description = "GitLab personal access token",
-            required = true
+            description = "GitLab personal access token (can also be set via GITLAB_TOKEN environment variable)",
+            required = false
     )
     private String gitlabToken;
 
@@ -87,6 +91,8 @@ public class SimpleGitLabMultiMergeRequestCommand implements Callable<Integer> {
 
     public SimpleGitLabMultiMergeRequestCommand() {
         this.conflictAnalysisService = new ConflictAnalysisService();
+        this.credentialService = new CredentialService();
+        this.inputValidator = new InputValidator();
     }
 
     @Override
@@ -95,6 +101,9 @@ public class SimpleGitLabMultiMergeRequestCommand implements Callable<Integer> {
             configureLogging(verbose);
 
             log.info("Starting GitLab Multi-MR Conflict Detection");
+
+            // Validate inputs
+            validateInputs();
 
             // Authenticate with GitLab
             conflictAnalysisService.authenticate(gitlabUrl, gitlabToken);
@@ -159,6 +168,58 @@ public class SimpleGitLabMultiMergeRequestCommand implements Callable<Integer> {
             rootLogger.setLevel(ch.qos.logback.classic.Level.DEBUG);
         } else {
             rootLogger.setLevel(ch.qos.logback.classic.Level.INFO);
+        }
+    }
+
+    /**
+     * Validates command-line inputs before processing.
+     * 
+     * @throws GitLabException if any input is invalid
+     */
+    private void validateInputs() throws GitLabException {
+        // Get credentials from environment variables if available
+        String token = credentialService.getGitLabToken(gitlabToken);
+        String url = credentialService.getGitLabUrl(gitlabUrl);
+
+        // Check if we have a token (either from CLI or environment)
+        if (token == null || token.trim().isEmpty()) {
+            throw new GitLabException("GitLab token is required. Provide it with --gitlab-token or set GITLAB_TOKEN environment variable.");
+        }
+
+        // Validate token format
+        if (!credentialService.isValidToken(token)) {
+            throw new GitLabException("Invalid GitLab token format");
+        }
+
+        // Check if we have a URL (either from CLI or environment)
+        if (url == null || url.trim().isEmpty()) {
+            throw new GitLabException("GitLab URL is required. Provide it with --gitlab-url or set GITLAB_URL environment variable.");
+        }
+
+        // Validate URL format
+        if (!inputValidator.isValidGitLabUrl(url)) {
+            throw new GitLabException("Invalid GitLab URL format: " + url);
+        }
+
+        // Validate project ID
+        if (projectId == null || projectId <= 0) {
+            throw new GitLabException("Invalid project ID: " + projectId);
+        }
+
+        // Validate project ID format
+        if (!inputValidator.isValidProjectId(projectId.toString())) {
+            throw new GitLabException("Invalid project ID format: " + projectId);
+        }
+
+        // Validate merge request IID if provided
+        if (mergeRequestIid != null) {
+            if (mergeRequestIid <= 0) {
+                throw new GitLabException("Invalid merge request IID: " + mergeRequestIid);
+            }
+
+            if (!inputValidator.isValidMergeRequestIid(mergeRequestIid.toString())) {
+                throw new GitLabException("Invalid merge request IID format: " + mergeRequestIid);
+            }
         }
     }
 

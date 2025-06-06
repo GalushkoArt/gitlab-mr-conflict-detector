@@ -7,6 +7,8 @@ import art.galushko.gitlab.mrconflict.gitlab.GitLabException;
 import art.galushko.gitlab.mrconflict.gitlab.MergeRequestService;
 import art.galushko.gitlab.mrconflict.model.MergeRequestConflict;
 import art.galushko.gitlab.mrconflict.model.MergeRequestInfo;
+import art.galushko.gitlab.mrconflict.security.CredentialService;
+import art.galushko.gitlab.mrconflict.security.InputValidator;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
@@ -25,6 +27,8 @@ public class ConflictAnalysisService {
     private final MergeRequestService mergeRequestService;
     private final ConflictDetector conflictDetector;
     private final ConflictFormatter conflictFormatter;
+    private final CredentialService credentialService;
+    private final InputValidator inputValidator;
 
     /**
      * Creates a new ConflictAnalysisService.
@@ -35,17 +39,32 @@ public class ConflictAnalysisService {
         this.mergeRequestService = serviceFactory.getMergeRequestService();
         this.conflictDetector = serviceFactory.getConflictDetector();
         this.conflictFormatter = serviceFactory.getConflictFormatter();
+        this.credentialService = new CredentialService();
+        this.inputValidator = new InputValidator();
     }
 
     /**
      * Authenticates with GitLab.
+     * Supports reading credentials from environment variables.
      *
      * @param gitlabUrl GitLab instance URL
      * @param gitlabToken GitLab personal access token
      * @throws GitLabException if authentication fails
      */
     public void authenticate(String gitlabUrl, String gitlabToken) throws GitLabException {
-        gitLabClient.authenticate(gitlabUrl, gitlabToken);
+        // Validate and potentially get credentials from environment variables
+        String token = credentialService.getGitLabToken(gitlabToken);
+        String url = credentialService.getGitLabUrl(gitlabUrl);
+
+        // Validate token format
+        if (!credentialService.isValidToken(token)) {
+            throw new GitLabException("Invalid GitLab token format");
+        }
+
+        // Log with masked token
+        log.debug("Authenticating with GitLab at {} using token {}", url, credentialService.maskToken(token));
+
+        gitLabClient.authenticate(url, token);
     }
 
     /**
@@ -70,7 +89,27 @@ public class ConflictAnalysisService {
     public List<MergeRequestInfo> fetchMergeRequests(Long projectId, Long specificMergeRequestIid) 
             throws GitLabException {
 
+        // Validate project ID
+        if (projectId == null || projectId <= 0) {
+            throw new GitLabException("Invalid project ID: " + projectId);
+        }
+
+        // Validate project ID format
+        if (!inputValidator.isValidProjectId(projectId.toString())) {
+            throw new GitLabException("Invalid project ID format: " + projectId);
+        }
+
         if (specificMergeRequestIid != null) {
+            // Validate merge request IID if provided
+            if (specificMergeRequestIid <= 0) {
+                throw new GitLabException("Invalid merge request IID: " + specificMergeRequestIid);
+            }
+
+            // Validate merge request IID format
+            if (!inputValidator.isValidMergeRequestIid(specificMergeRequestIid.toString())) {
+                throw new GitLabException("Invalid merge request IID format: " + specificMergeRequestIid);
+            }
+
             // Fetch specific merge request
             log.info("Fetching specific merge request: {}", specificMergeRequestIid);
             var mr = mergeRequestService.getMergeRequest(projectId, specificMergeRequestIid);

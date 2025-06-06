@@ -1,5 +1,7 @@
 package art.galushko.gitlab.mrconflict.gitlab;
 
+import art.galushko.gitlab.mrconflict.security.CredentialService;
+import art.galushko.gitlab.mrconflict.security.InputValidator;
 import lombok.extern.slf4j.Slf4j;
 import org.gitlab4j.api.Constants;
 import org.gitlab4j.api.GitLabApi;
@@ -17,19 +19,45 @@ import java.util.stream.Collectors;
 @Slf4j
 public class GitLab4JClient implements GitLabClient {
     GitLabApi gitLabApi; // Package-private for service access
+    private final CredentialService credentialService;
+    private final InputValidator inputValidator;
+
+    /**
+     * Creates a new GitLab4JClient with security services.
+     */
+    public GitLab4JClient() {
+        this.credentialService = new CredentialService();
+        this.inputValidator = new InputValidator();
+    }
 
     @Override
     public GitLab4JClient authenticate(String gitlabUrl, String accessToken) throws GitLabException {
         try {
-            this.gitLabApi = new GitLabApi(gitlabUrl, accessToken);
+            // Validate token format
+            if (!credentialService.isValidToken(accessToken)) {
+                throw new GitLabException("Invalid GitLab token format");
+            }
+
+            // Use token from environment variable if available
+            String token = credentialService.getGitLabToken(accessToken);
+            String url = credentialService.getGitLabUrl(gitlabUrl);
+
+            // Validate GitLab URL
+            if (!inputValidator.isValidGitLabUrl(url)) {
+                throw new GitLabException("Invalid GitLab URL format: " + url);
+            }
+
+            this.gitLabApi = new GitLabApi(url, token);
 
             // Test authentication by getting current user
             var currentUser = gitLabApi.getUserApi().getCurrentUser();
-            log.info("Successfully authenticated as user: {} ({})",currentUser.getUsername(), currentUser.getName());
+            log.info("Successfully authenticated as user: {} ({})", currentUser.getUsername(), currentUser.getName());
 
             return this;
         } catch (GitLabApiException e) {
-            throw new GitLabException("Failed to authenticate with GitLab: " + e.getMessage(), e);
+            // Sanitize error message to remove token if present
+            String sanitizedMessage = credentialService.sanitizeErrorMessage(e.getMessage(), accessToken);
+            throw new GitLabException("Failed to authenticate with GitLab: " + sanitizedMessage, e);
         }
     }
 
@@ -78,7 +106,24 @@ public class GitLab4JClient implements GitLabClient {
     @Override
     public Optional<Branch> getBranch(Long projectId, String branchName) throws GitLabException {
         try {
-            Branch branch = gitLabApi.getRepositoryApi().getBranch(projectId, branchName);
+            // Validate inputs
+            if (projectId == null || projectId <= 0) {
+                throw new GitLabException("Invalid project ID: " + projectId);
+            }
+
+            if (branchName == null || branchName.trim().isEmpty()) {
+                throw new GitLabException("Branch name cannot be empty");
+            }
+
+            // Validate branch name format
+            if (!inputValidator.isValidBranchName(branchName)) {
+                throw new GitLabException("Invalid branch name format: " + branchName);
+            }
+
+            // Sanitize branch name for API call
+            String sanitizedBranchName = inputValidator.escapeForGitLabApi(branchName);
+
+            Branch branch = gitLabApi.getRepositoryApi().getBranch(projectId, sanitizedBranchName);
             return Optional.ofNullable(branch);
         } catch (GitLabApiException e) {
             if (e.getHttpStatus() == 404) {
@@ -105,6 +150,20 @@ public class GitLab4JClient implements GitLabClient {
     @Override
     public MergeRequest getMergeRequest(Long projectId, Long mergeRequestIid) throws GitLabException {
         try {
+            // Validate inputs
+            if (projectId == null || projectId <= 0) {
+                throw new GitLabException("Invalid project ID: " + projectId);
+            }
+
+            if (mergeRequestIid == null || mergeRequestIid <= 0) {
+                throw new GitLabException("Invalid merge request IID: " + mergeRequestIid);
+            }
+
+            // Validate merge request IID format
+            if (!inputValidator.isValidMergeRequestIid(mergeRequestIid.toString())) {
+                throw new GitLabException("Invalid merge request IID format: " + mergeRequestIid);
+            }
+
             return gitLabApi.getMergeRequestApi().getMergeRequest(projectId, mergeRequestIid);
         } catch (GitLabApiException e) {
             throw new GitLabException("Failed to get merge request " + mergeRequestIid + 
@@ -192,7 +251,23 @@ public class GitLab4JClient implements GitLabClient {
     @Override
     public void createMergeRequestNote(Long projectId, Long mergeRequestIid, String noteContent) throws GitLabException {
         try {
-            gitLabApi.getNotesApi().createMergeRequestNote(projectId, mergeRequestIid, noteContent);
+            // Validate inputs
+            if (projectId == null || projectId <= 0) {
+                throw new GitLabException("Invalid project ID: " + projectId);
+            }
+
+            if (mergeRequestIid == null || mergeRequestIid <= 0) {
+                throw new GitLabException("Invalid merge request IID: " + mergeRequestIid);
+            }
+
+            if (noteContent == null || noteContent.trim().isEmpty()) {
+                throw new GitLabException("Note content cannot be empty");
+            }
+
+            // Sanitize note content to prevent injection attacks
+            String sanitizedNoteContent = inputValidator.sanitizeInput(noteContent);
+
+            gitLabApi.getNotesApi().createMergeRequestNote(projectId, mergeRequestIid, sanitizedNoteContent);
         } catch (GitLabApiException e) {
             throw new GitLabException("Failed to create note for MR " + mergeRequestIid, e);
         }

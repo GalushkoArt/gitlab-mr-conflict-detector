@@ -66,7 +66,7 @@ class ConflictAnalysisServiceTest {
     void shouldAuthenticateWithGitLab() throws GitLabException {
         // Given
         String gitlabUrl = "https://gitlab.com";
-        String gitlabToken = "token123";
+        String gitlabToken = "to-ken_1234567890_-ABCDE";
 
         // When
         service.authenticate(gitlabUrl, gitlabToken);

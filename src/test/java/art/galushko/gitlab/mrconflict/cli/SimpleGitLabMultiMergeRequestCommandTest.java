@@ -63,7 +63,7 @@ class SimpleGitLabMultiMergeRequestCommandTest {
 
         // Then
         String output = errWriter.toString();
-        assertThat(output).contains("Missing required options");
+        assertThat(output).contains("Missing required option");
         assertThat(exitCode).isNotEqualTo(0);
     }
 }

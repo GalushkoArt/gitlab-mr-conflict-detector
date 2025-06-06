@@ -7,6 +7,4 @@ package art.galushko.gitlab.mrconflict.gitlab;
  */
 public interface GitLabClient extends GitLabAuthenticationClient, GitLabProjectClient, 
                                       GitLabBranchClient, GitLabMergeRequestClient {
-    // This is a composite interface that extends all the smaller interfaces
-    // No additional methods needed here
 }
