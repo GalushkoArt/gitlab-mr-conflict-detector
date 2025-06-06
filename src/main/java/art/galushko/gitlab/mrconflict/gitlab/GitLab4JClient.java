@@ -17,12 +17,12 @@ import java.util.stream.Collectors;
 @Slf4j
 public class GitLab4JClient implements GitLabClient {
     GitLabApi gitLabApi; // Package-private for service access
-    
+
     @Override
     public GitLab4JClient authenticate(String gitlabUrl, String accessToken) throws GitLabException {
         try {
             this.gitLabApi = new GitLabApi(gitlabUrl, accessToken);
-            
+
             // Test authentication by getting current user
             var currentUser = gitLabApi.getUserApi().getCurrentUser();
             log.info("Successfully authenticated as user: {} ({})",currentUser.getUsername(), currentUser.getName());
@@ -32,7 +32,7 @@ public class GitLab4JClient implements GitLabClient {
             throw new GitLabException("Failed to authenticate with GitLab: " + e.getMessage(), e);
         }
     }
-    
+
     @Override
     public Project getProject(Long projectId) throws GitLabException {
         try {
@@ -41,7 +41,7 @@ public class GitLab4JClient implements GitLabClient {
             throw new GitLabException("Failed to get project with ID: " + projectId, e);
         }
     }
-    
+
     @Override
     public Project getProject(String projectPath) throws GitLabException {
         try {
@@ -50,7 +50,7 @@ public class GitLab4JClient implements GitLabClient {
             throw new GitLabException("Failed to get project with path: " + projectPath, e);
         }
     }
-    
+
     @Override
     public List<Branch> getBranches(Long projectId) throws GitLabException {
         try {
@@ -59,22 +59,22 @@ public class GitLab4JClient implements GitLabClient {
             throw new GitLabException("Failed to get branches for project: " + projectId, e);
         }
     }
-    
+
     @Override
     public List<String> getProtectedBranches(Long projectId) throws GitLabException {
         try {
             List<ProtectedBranch> protectedBranches = gitLabApi.getProtectedBranchesApi()
                     .getProtectedBranches(projectId);
-            
+
             return protectedBranches.stream()
                     .map(ProtectedBranch::getName)
                     .collect(Collectors.toList());
-                    
+
         } catch (GitLabApiException e) {
             throw new GitLabException("Failed to get protected branches for project: " + projectId, e);
         }
     }
-    
+
     @Override
     public Optional<Branch> getBranch(Long projectId, String branchName) throws GitLabException {
         try {
@@ -88,20 +88,20 @@ public class GitLab4JClient implements GitLabClient {
                                     "' for project: " + projectId, e);
         }
     }
-    
+
     @Override
     public List<MergeRequest> getMergeRequests(Long projectId, String state) throws GitLabException {
         try {
             MergeRequestFilter filter = new MergeRequestFilter()
                     .withProjectId(projectId)
                     .withState(Constants.MergeRequestState.forValue(state));
-                    
+
             return gitLabApi.getMergeRequestApi().getMergeRequests(filter);
         } catch (GitLabApiException e) {
             throw new GitLabException("Failed to get merge requests for project: " + projectId, e);
         }
     }
-    
+
     @Override
     public MergeRequest getMergeRequest(Long projectId, Long mergeRequestIid) throws GitLabException {
         try {
@@ -111,7 +111,7 @@ public class GitLab4JClient implements GitLabClient {
                                     " for project: " + projectId, e);
         }
     }
-    
+
     @Override
     public void updateMergeRequestStatus(Long projectId, Long mergeRequestIid, boolean hasConflicts) 
             throws GitLabException {
@@ -119,10 +119,10 @@ public class GitLab4JClient implements GitLabClient {
             // Note: GitLab doesn't allow direct status updates via API for conflict detection
             // This would typically be handled by GitLab's built-in conflict detection
             // We can add labels or update description instead
-            
+
             MergeRequest mr = getMergeRequest(projectId, mergeRequestIid);
             List<String> labels = mr.getLabels();
-            
+
             if (hasConflicts) {
                 if (!labels.contains("conflicts")) {
                     labels.add("conflicts");
@@ -134,17 +134,17 @@ public class GitLab4JClient implements GitLabClient {
                 }
                 labels.remove("conflicts");
             }
-            
+
             gitLabApi.getMergeRequestApi().updateMergeRequest(projectId, mergeRequestIid, 
                     null, null, null, null, null, String.join(",", labels), null, null, null, null, null);
-                    
+
             log.debug("Updated MR {} labels based on conflict status", mergeRequestIid);
-            
+
         } catch (GitLabApiException e) {
             throw new GitLabException("Failed to update merge request status", e);
         }
     }
-    
+
     @Override
     public boolean hasProjectAccess(Long projectId) throws GitLabException {
         try {
@@ -157,7 +157,7 @@ public class GitLab4JClient implements GitLabClient {
             throw new GitLabException("Failed to check project access", e);
         }
     }
-    
+
     @Override
     public String getDefaultBranch(Long projectId) throws GitLabException {
         try {
@@ -167,7 +167,7 @@ public class GitLab4JClient implements GitLabClient {
             throw new GitLabException("Failed to get default branch for project: " + projectId, e);
         }
     }
-    
+
     @Override
     public boolean isBranchProtected(Long projectId, String branchName) throws GitLabException {
         try {
@@ -178,12 +178,23 @@ public class GitLab4JClient implements GitLabClient {
         }
     }
 
-    /**
-     * Gets the GitLabApi instance for advanced operations.
-     * Public for service access.
-     */
-    public NotesApi getNotesApi() {
-        return gitLabApi.getNotesApi();
+    @Override
+    public List<Diff> getMergeRequestChanges(Long projectId, Long mergeRequestIid) throws GitLabException {
+        try {
+            return gitLabApi.getMergeRequestApi()
+                    .getMergeRequestChanges(projectId, mergeRequestIid)
+                    .getChanges();
+        } catch (GitLabApiException e) {
+            throw new GitLabException("Failed to get changes for MR " + mergeRequestIid, e);
+        }
+    }
+
+    @Override
+    public void createMergeRequestNote(Long projectId, Long mergeRequestIid, String noteContent) throws GitLabException {
+        try {
+            gitLabApi.getNotesApi().createMergeRequestNote(projectId, mergeRequestIid, noteContent);
+        } catch (GitLabApiException e) {
+            throw new GitLabException("Failed to create note for MR " + mergeRequestIid, e);
+        }
     }
 }
-

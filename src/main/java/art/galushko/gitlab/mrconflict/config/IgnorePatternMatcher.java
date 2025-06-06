@@ -10,7 +10,7 @@ import java.nio.file.PathMatcher;
  * Enhanced file pattern matcher that supports simple ignore patterns.
  */
 @Slf4j
-public class IgnorePatternMatcher {
+public class IgnorePatternMatcher implements PatternMatcher {
     private final boolean caseSensitive;
 
     public IgnorePatternMatcher(boolean caseSensitive) {
@@ -120,4 +120,3 @@ public class IgnorePatternMatcher {
         return filePath;
     }
 }
-

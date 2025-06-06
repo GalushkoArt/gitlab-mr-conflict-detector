@@ -1,9 +1,6 @@
 package art.galushko.gitlab.mrconflict.cli;
 
-import art.galushko.gitlab.mrconflict.config.IgnorePatternMatcher;
-import art.galushko.gitlab.mrconflict.core.MultiMergeRequestConflictDetector;
-import art.galushko.gitlab.mrconflict.gitlab.GitLab4JClient;
-import art.galushko.gitlab.mrconflict.gitlab.GitLab4JMergeRequestService;
+import art.galushko.gitlab.mrconflict.core.ConflictAnalysisService;
 import art.galushko.gitlab.mrconflict.gitlab.GitLabException;
 import art.galushko.gitlab.mrconflict.model.MergeRequestConflict;
 import art.galushko.gitlab.mrconflict.model.MergeRequestInfo;
@@ -24,6 +21,8 @@ import java.util.Set;
         version = "1.1.0"
 )
 public class SimpleGitLabMultiMergeRequestCommand implements Runnable {
+
+    private final ConflictAnalysisService conflictAnalysisService;
 
     @CommandLine.Option(
             names = {"--gitlab-url"},
@@ -85,6 +84,10 @@ public class SimpleGitLabMultiMergeRequestCommand implements Runnable {
     private static final int EXIT_CONFLICTS_DETECTED = 1;
     private static final int EXIT_ERROR = 2;
 
+    public SimpleGitLabMultiMergeRequestCommand() {
+        this.conflictAnalysisService = new ConflictAnalysisService();
+    }
+
     @Override
     public void run() {
         try {
@@ -93,10 +96,10 @@ public class SimpleGitLabMultiMergeRequestCommand implements Runnable {
             log.info("Starting GitLab Multi-MR Conflict Detection");
 
             // Authenticate with GitLab
-            var gitlabClient = new GitLab4JClient().authenticate(gitlabUrl, gitlabToken);
+            conflictAnalysisService.authenticate(gitlabUrl, gitlabToken);
 
             // Validate GitLab connection
-            if (!gitlabClient.hasProjectAccess(projectId)) {
+            if (!conflictAnalysisService.hasProjectAccess(projectId)) {
                 throw new GitLabException("No access to project " + projectId +
                         ". Check your GitLab token permissions.");
             }
@@ -104,8 +107,7 @@ public class SimpleGitLabMultiMergeRequestCommand implements Runnable {
             log.info("Analyzing merge requests for project ID: {}", projectId);
 
             // Fetch merge requests from GitLab
-            var mergeRequestService = new GitLab4JMergeRequestService(gitlabClient);
-            var mergeRequests = fetchMergeRequests(mergeRequestService, projectId);
+            List<MergeRequestInfo> mergeRequests = conflictAnalysisService.fetchMergeRequests(projectId, mergeRequestIid);
 
             if (mergeRequests.isEmpty()) {
                 log.info("No merge requests found for analysis");
@@ -116,24 +118,25 @@ public class SimpleGitLabMultiMergeRequestCommand implements Runnable {
             log.info("Found {} merge requests for analysis", mergeRequests.size());
 
             // Get ignore patterns (empty for now, can be extended)
-            var ignorePatterns = List.<String>of("ignored.txt", "ignored_dir/*");
+            List<String> ignorePatterns = List.of("ignored.txt", "ignored_dir/*");
 
             // Perform conflict detection
-            var conflicts = performConflictDetection(mergeRequests, ignorePatterns);
+            List<MergeRequestConflict> conflicts = conflictAnalysisService.detectConflicts(mergeRequests, ignorePatterns);
 
             // Generate and display output
-            var output = formatOutput(conflicts);
+            String output = conflictAnalysisService.formatConflicts(conflicts);
             System.out.println(output);
 
             // Log conflicting MR IDs
-            var conflictingMrIds = getConflictingMergeRequestIds(conflicts);
+            Set<Integer> conflictingMrIds = conflictAnalysisService.getConflictingMergeRequestIds(conflicts);
             if (!conflictingMrIds.isEmpty()) {
                 log.info("Merge requests with conflicts: {}", conflictingMrIds);
                 log.info("These MRs should be marked with 'conflict' label");
 
                 // Optionally update GitLab with conflict information
                 if (createGitlabNote || updateMrStatus) {
-                    updateGitLabWithConflicts(gitlabClient, conflictingMrIds, conflicts);
+                    conflictAnalysisService.updateGitLabWithConflicts(
+                            projectId, conflictingMrIds, conflicts, createGitlabNote, updateMrStatus, dryRun);
                 }
             }
 
@@ -159,116 +162,8 @@ public class SimpleGitLabMultiMergeRequestCommand implements Runnable {
         }
     }
 
-    private List<MergeRequestInfo> fetchMergeRequests(GitLab4JMergeRequestService service, Long projectId)
-            throws GitLabException {
-
-        if (mergeRequestIid != null) {
-            // Fetch specific merge request
-            log.info("Fetching specific merge request: {}", mergeRequestIid);
-            var mr = service.getMergeRequest(projectId, mergeRequestIid);
-            return List.of(mr);
-        } else {
-            // Fetch all open merge requests for conflict analysis
-            log.info("Fetching all open merge requests for conflict analysis");
-            return service.getMergeRequestsForConflictAnalysis(projectId);
-        }
-    }
-
-    private List<MergeRequestConflict> performConflictDetection(List<MergeRequestInfo> mergeRequests,
-                                                                List<String> ignorePatterns) {
-        var ignorePatternMatcher = new IgnorePatternMatcher();
-        var detector = new MultiMergeRequestConflictDetector(ignorePatternMatcher);
-
-        return detector.detectConflicts(mergeRequests, ignorePatterns);
-    }
-
-    private String formatOutput(List<MergeRequestConflict> conflicts) {
-        if (conflicts.isEmpty()) {
-            return "No conflicts detected.";
-        }
-
-        var detector = new MultiMergeRequestConflictDetector(new IgnorePatternMatcher());
-        return detector.formatConflicts(conflicts);
-    }
-
-    private Set<Integer> getConflictingMergeRequestIds(List<MergeRequestConflict> conflicts) {
-        var detector = new MultiMergeRequestConflictDetector(new IgnorePatternMatcher());
-        return detector.getConflictingMergeRequestIds(conflicts);
-    }
-
-    private void updateGitLabWithConflicts(GitLab4JClient gitlabClient, Set<Integer> conflictingMrIds,
-                                           List<MergeRequestConflict> conflicts) {
-        if (dryRun) {
-            log.info("Dry run mode - skipping GitLab updates");
-            return;
-        }
-
-        try {
-            for (Integer mrId : conflictingMrIds) {
-                if (createGitlabNote) {
-                    createConflictNote(gitlabClient, projectId, mrId.longValue(), conflicts);
-                }
-
-                if (updateMrStatus) {
-                    gitlabClient.updateMergeRequestStatus(projectId, mrId.longValue(), true);
-                }
-            }
-
-        } catch (Exception e) {
-            log.warn("Failed to update GitLab with conflict information: {}", e.getMessage());
-        }
-    }
-
-    private void createConflictNote(GitLab4JClient gitlabClient, Long projectId, Long mergeRequestIid,
-                                    List<MergeRequestConflict> conflicts) {
-        try {
-            // Find conflicts involving this MR
-            var relevantConflicts = conflicts.stream()
-                    .filter(conflict -> conflict.firstMr().id() == mergeRequestIid ||
-                            conflict.secondMr().id() == mergeRequestIid)
-                    .toList();
-
-            if (!relevantConflicts.isEmpty()) {
-                String noteContent = formatConflictNote(relevantConflicts, mergeRequestIid);
-
-                gitlabClient.getNotesApi()
-                        .createMergeRequestNote(projectId, mergeRequestIid, noteContent);
-
-                log.info("Created conflict note for MR {} in project {}", mergeRequestIid, projectId);
-            }
-
-        } catch (Exception e) {
-            log.warn("Failed to create conflict note for MR {}: {}", mergeRequestIid, e.getMessage());
-        }
-    }
-
-    private String formatConflictNote(List<MergeRequestConflict> conflicts, Long mergeRequestIid) {
-        StringBuilder note = new StringBuilder();
-        note.append("## ⚠️ Merge Request Conflicts Detected\n\n");
-        note.append("This merge request has conflicts with other open merge requests:\n\n");
-
-        for (MergeRequestConflict conflict : conflicts) {
-            int otherMrId = conflict.firstMr().id() == mergeRequestIid ?
-                    conflict.secondMr().id() : conflict.firstMr().id();
-
-            note.append("- **Conflict with MR").append(otherMrId).append("**: ");
-            note.append(conflict.getDescription()).append("\n");
-        }
-
-        note.append("\n**Action Required:**\n");
-        note.append("- Review the conflicting files\n");
-        note.append("- Coordinate with other MR authors\n");
-        note.append("- Consider rebasing or merging order\n\n");
-        note.append("---\n");
-        note.append("*Generated by GitLab Multi-MR Conflict Detector at ")
-                .append(java.time.Instant.now()).append("*");
-
-        return note.toString();
-    }
-
     public static void main(String[] args) {
         int exitCode = new CommandLine(new SimpleGitLabMultiMergeRequestCommand()).execute(args);
         System.exit(exitCode);
     }
 }
-

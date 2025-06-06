@@ -3,8 +3,6 @@ package art.galushko.gitlab.mrconflict.gitlab;
 import art.galushko.gitlab.mrconflict.model.MergeRequestInfo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.gitlab4j.api.GitLabApi;
-import org.gitlab4j.api.GitLabApiException;
 import org.gitlab4j.api.models.Diff;
 import org.gitlab4j.api.models.MergeRequest;
 
@@ -18,12 +16,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class GitLab4JMergeRequestService implements MergeRequestService {
 
-    private final GitLab4JClient gitLabClient;
-
-    // Package-private access to GitLabApi for advanced operations
-    GitLabApi getGitLabApi() {
-        return gitLabClient.gitLabApi;
-    }
+    private final GitLabClient gitLabClient;
 
     @Override
     public List<MergeRequestInfo> getOpenMergeRequests(Long projectId) throws GitLabException {
@@ -75,28 +68,21 @@ public class GitLab4JMergeRequestService implements MergeRequestService {
     public List<String> getChangedFiles(Long projectId, Long mergeRequestIid) throws GitLabException {
         log.debug("Fetching changed files for MR {} in project {}", mergeRequestIid, projectId);
 
-        try {
-            // Get the diffs for the merge request
-            List<Diff> diffs = getGitLabApi().getMergeRequestApi()
-                    .getMergeRequestChanges(projectId, mergeRequestIid)
-                    .getChanges();
+        // Get the diffs for the merge request
+        List<Diff> diffs = gitLabClient.getMergeRequestChanges(projectId, mergeRequestIid);
 
-            return diffs.stream()
-                    .map(diff -> {
-                        // Use new_path if available (for new/modified files), otherwise old_path (for deleted files)
-                        String filePath = diff.getNewPath();
-                        if (filePath == null || filePath.equals("/dev/null")) {
-                            filePath = diff.getOldPath();
-                        }
-                        return filePath;
-                    })
-                    .filter(path -> path != null && !path.equals("/dev/null"))
-                    .distinct()
-                    .collect(Collectors.toList());
-
-        } catch (GitLabApiException e) {
-            throw new GitLabException("Failed to get changed files for MR " + mergeRequestIid, e);
-        }
+        return diffs.stream()
+                .map(diff -> {
+                    // Use new_path if available (for new/modified files), otherwise old_path (for deleted files)
+                    String filePath = diff.getNewPath();
+                    if (filePath == null || filePath.equals("/dev/null")) {
+                        filePath = diff.getOldPath();
+                    }
+                    return filePath;
+                })
+                .filter(path -> path != null && !path.equals("/dev/null"))
+                .distinct()
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -140,4 +126,3 @@ public class GitLab4JMergeRequestService implements MergeRequestService {
         return false; // For now, include all MRs
     }
 }
-

@@ -1,6 +1,6 @@
 package art.galushko.gitlab.mrconflict.core;
 
-import art.galushko.gitlab.mrconflict.config.IgnorePatternMatcher;
+import art.galushko.gitlab.mrconflict.config.PatternMatcher;
 import art.galushko.gitlab.mrconflict.model.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,9 +14,9 @@ import java.util.stream.Stream;
  */
 @Slf4j
 @RequiredArgsConstructor
-public class MultiMergeRequestConflictDetector {
+public class MultiMergeRequestConflictDetector implements ConflictDetector {
 
-    private final IgnorePatternMatcher ignorePatternMatcher;
+    private final PatternMatcher ignorePatternMatcher;
 
     /**
      * Detects conflicts between multiple merge requests.
@@ -176,4 +176,3 @@ public class MultiMergeRequestConflictDetector {
                 .collect(Collectors.toSet());
     }
 }
-

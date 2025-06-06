@@ -11,7 +11,7 @@ import java.util.Optional;
  * Interface for GitLab API operations.
  */
 public interface GitLabClient {
-    
+
     /**
      * Authenticates with GitLab using the provided token.
      *
@@ -21,7 +21,7 @@ public interface GitLabClient {
      * @throws GitLabException if authentication fails
      */
     GitLab4JClient authenticate(String gitlabUrl, String accessToken) throws GitLabException;
-    
+
     /**
      * Gets a project by its ID.
      *
@@ -30,7 +30,7 @@ public interface GitLabClient {
      * @throws GitLabException if project cannot be retrieved
      */
     Project getProject(Long projectId) throws GitLabException;
-    
+
     /**
      * Gets a project by its path (namespace/project-name).
      *
@@ -39,7 +39,7 @@ public interface GitLabClient {
      * @throws GitLabException if project cannot be retrieved
      */
     Project getProject(String projectPath) throws GitLabException;
-    
+
     /**
      * Gets all branches for a project.
      *
@@ -48,7 +48,7 @@ public interface GitLabClient {
      * @throws GitLabException if branches cannot be retrieved
      */
     List<Branch> getBranches(Long projectId) throws GitLabException;
-    
+
     /**
      * Gets protected branches for a project.
      *
@@ -57,7 +57,7 @@ public interface GitLabClient {
      * @throws GitLabException if protected branches cannot be retrieved
      */
     List<String> getProtectedBranches(Long projectId) throws GitLabException;
-    
+
     /**
      * Gets a specific branch information.
      *
@@ -67,7 +67,7 @@ public interface GitLabClient {
      * @throws GitLabException if branch cannot be retrieved
      */
     Optional<Branch> getBranch(Long projectId, String branchName) throws GitLabException;
-    
+
     /**
      * Gets merge requests for a project.
      *
@@ -77,7 +77,7 @@ public interface GitLabClient {
      * @throws GitLabException if merge requests cannot be retrieved
      */
     List<MergeRequest> getMergeRequests(Long projectId, String state) throws GitLabException;
-    
+
     /**
      * Gets a specific merge request.
      *
@@ -98,7 +98,7 @@ public interface GitLabClient {
      */
     void updateMergeRequestStatus(Long projectId, Long mergeRequestIid, boolean hasConflicts) 
             throws GitLabException;
-    
+
     /**
      * Checks if the current user has permission to access the project.
      *
@@ -107,7 +107,7 @@ public interface GitLabClient {
      * @throws GitLabException if permission check fails
      */
     boolean hasProjectAccess(Long projectId) throws GitLabException;
-    
+
     /**
      * Gets the default branch for a project.
      *
@@ -116,7 +116,7 @@ public interface GitLabClient {
      * @throws GitLabException if default branch cannot be determined
      */
     String getDefaultBranch(Long projectId) throws GitLabException;
-    
+
     /**
      * Checks if a branch is protected.
      *
@@ -126,5 +126,24 @@ public interface GitLabClient {
      * @throws GitLabException if protection status cannot be determined
      */
     boolean isBranchProtected(Long projectId, String branchName) throws GitLabException;
-}
 
+    /**
+     * Gets the changes for a merge request.
+     *
+     * @param projectId GitLab project ID
+     * @param mergeRequestIid merge request internal ID
+     * @return list of changes (diffs)
+     * @throws GitLabException if changes cannot be retrieved
+     */
+    List<org.gitlab4j.api.models.Diff> getMergeRequestChanges(Long projectId, Long mergeRequestIid) throws GitLabException;
+
+    /**
+     * Creates a note (comment) on a merge request.
+     *
+     * @param projectId GitLab project ID
+     * @param mergeRequestIid merge request internal ID
+     * @param noteContent content of the note
+     * @throws GitLabException if note cannot be created
+     */
+    void createMergeRequestNote(Long projectId, Long mergeRequestIid, String noteContent) throws GitLabException;
+}
