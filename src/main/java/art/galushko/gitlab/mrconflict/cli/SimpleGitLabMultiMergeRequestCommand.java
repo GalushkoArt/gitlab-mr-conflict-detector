@@ -95,6 +95,14 @@ public class SimpleGitLabMultiMergeRequestCommand implements Callable<Integer> {
         this.inputValidator = new InputValidator();
     }
 
+    /**
+     * Executes the command to detect conflicts between merge requests.
+     * This method is called by the Picocli framework when the command is run.
+     *
+     * @return EXIT_SUCCESS (0) if no conflicts are found,
+     *         EXIT_CONFLICTS_DETECTED (1) if conflicts are found,
+     *         EXIT_ERROR (2) if an error occurs
+     */
     @Override
     public Integer call() {
         try {
@@ -223,6 +231,12 @@ public class SimpleGitLabMultiMergeRequestCommand implements Callable<Integer> {
         }
     }
 
+    /**
+     * The main entry point for the application.
+     * Creates a new command instance and executes it with the provided arguments.
+     *
+     * @param args command-line arguments
+     */
     public static void main(String[] args) {
         int exitCode = new CommandLine(new SimpleGitLabMultiMergeRequestCommand()).execute(args);
         System.exit(exitCode);

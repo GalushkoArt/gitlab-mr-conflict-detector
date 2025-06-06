@@ -131,6 +131,12 @@ export GITLAB_PROJECT_ID=123
 
 ## 🏗️ Architecture
 
+### Documentation
+
+For detailed documentation about the project architecture and code, please refer to:
+
+- [Architecture Documentation](docs/architecture.md): Detailed system architecture with component diagrams and integration points
+
 ### New Components
 
 #### GitLab Integration (`src/main/java/art/galushko/gitlab/mrconflict/gitlab/`)
@@ -390,4 +396,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - 🎯 Single MR conflict detection
 - 🎯 Multiple output formats
 - 🎯 File filtering capabilities
-

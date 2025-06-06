@@ -8,15 +8,29 @@ import java.nio.file.PathMatcher;
 
 /**
  * Enhanced file pattern matcher that supports simple ignore patterns.
+ * This class provides functionality to match file paths against patterns,
+ * similar to .gitignore patterns.
  */
 @Slf4j
 public class IgnorePatternMatcher implements PatternMatcher {
+    /**
+     * Flag indicating whether pattern matching should be case-sensitive.
+     * If true, matching is case-sensitive; if false, matching is case-insensitive.
+     */
     private final boolean caseSensitive;
 
+    /**
+     * Constructs a new IgnorePatternMatcher with the specified case sensitivity.
+     *
+     * @param caseSensitive true for case-sensitive matching, false for case-insensitive matching
+     */
     public IgnorePatternMatcher(boolean caseSensitive) {
         this.caseSensitive = caseSensitive;
     }
 
+    /**
+     * Constructs a new IgnorePatternMatcher with default case-sensitive matching.
+     */
     public IgnorePatternMatcher() {
         this(true);
     }
@@ -90,6 +104,12 @@ public class IgnorePatternMatcher implements PatternMatcher {
 
     /**
      * Normalizes a path for consistent matching.
+     * This method ensures that paths are in a consistent format by:
+     * 1. Converting all backslashes to forward slashes
+     * 2. Removing any leading slash
+     *
+     * @param path the path to normalize
+     * @return the normalized path
      */
     private String normalizePath(String path) {
         // Ensure path uses forward slashes for consistency
