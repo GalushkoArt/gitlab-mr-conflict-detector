@@ -11,53 +11,6 @@ import java.util.Objects;
 @Builder
 public record MergeRequestConflict(MergeRequestInfo firstMr, MergeRequestInfo secondMr, List<String> conflictingFiles,
                                    ConflictReason reason) {
-    /**
-     * Gets a formatted description of the conflict.
-     *
-     * @return formatted conflict description
-     */
-    public String getDescription() {
-        if (conflictingFiles.size() == 1) {
-            return String.format("conflict in modification of `%s`", conflictingFiles.get(0));
-        } else {
-            return String.format("conflicts in modification of %d files: %s",
-                    conflictingFiles.size(),
-                    String.join(", ", conflictingFiles.stream()
-                            .map(f -> "`" + f + "`")
-                            .toList()));
-        }
-    }
-
-    /**
-     * Gets the formatted output string for this conflict using merge request titles.
-     *
-     * @return formatted output string
-     */
-    public String getFormattedOutput() {
-        String firstTitle = truncateTitle(firstMr.title());
-        String secondTitle = truncateTitle(secondMr.title());
-
-        return String.format("\"%s\" vs \"%s\"%n- Issue: %s",
-                firstTitle, secondTitle, getDescription());
-    }
-
-    /**
-     * Truncates merge request titles to a reasonable length for display.
-     */
-    private String truncateTitle(String title) {
-        if (title == null || title.trim().isEmpty()) {
-            return "Untitled";
-        }
-
-        final int MAX_TITLE_LENGTH = 50;
-        String trimmedTitle = title.trim();
-
-        if (trimmedTitle.length() <= MAX_TITLE_LENGTH) {
-            return trimmedTitle;
-        }
-
-        return trimmedTitle.substring(0, MAX_TITLE_LENGTH - 3) + "...";
-    }
 
     @Override
     public boolean equals(Object o) {
@@ -75,11 +28,11 @@ public record MergeRequestConflict(MergeRequestInfo firstMr, MergeRequestInfo se
 
     @Override
     public String toString() {
-        String firstTitle = truncateTitle(firstMr.title());
-        String secondTitle = truncateTitle(secondMr.title());
-
-        return String.format("\"%s\" vs \"%s\" (%d files)",
-                firstTitle, secondTitle, conflictingFiles.size());
+        return "MergeRequestConflict{" +
+                "firstMr=" + firstMr +
+                ", secondMr=" + secondMr +
+                ", conflictingFiles=" + conflictingFiles.size() +
+                ", reason=" + reason +
+                '}';
     }
 }
-

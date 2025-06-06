@@ -4,6 +4,8 @@ import art.galushko.gitlab.mrconflict.config.IgnorePatternMatcher;
 import art.galushko.gitlab.mrconflict.config.PatternMatcher;
 import art.galushko.gitlab.mrconflict.core.ConflictDetector;
 import art.galushko.gitlab.mrconflict.core.MultiMergeRequestConflictDetector;
+import art.galushko.gitlab.mrconflict.formatter.ConflictFormatter;
+import art.galushko.gitlab.mrconflict.formatter.DefaultConflictFormatter;
 import art.galushko.gitlab.mrconflict.gitlab.GitLab4JClient;
 import art.galushko.gitlab.mrconflict.gitlab.GitLab4JMergeRequestService;
 import art.galushko.gitlab.mrconflict.gitlab.GitLabClient;
@@ -14,19 +16,20 @@ import art.galushko.gitlab.mrconflict.gitlab.MergeRequestService;
  * This class implements a simple dependency injection pattern.
  */
 public class ServiceFactory {
-    
+
     private static ServiceFactory instance;
-    
+
     // Singleton instances of services
     private PatternMatcher patternMatcher;
     private GitLabClient gitLabClient;
     private MergeRequestService mergeRequestService;
     private ConflictDetector conflictDetector;
-    
+    private ConflictFormatter conflictFormatter;
+
     private ServiceFactory() {
         // Private constructor to enforce singleton pattern
     }
-    
+
     /**
      * Gets the singleton instance of the ServiceFactory.
      *
@@ -38,7 +41,7 @@ public class ServiceFactory {
         }
         return instance;
     }
-    
+
     /**
      * Gets a PatternMatcher instance.
      *
@@ -51,7 +54,7 @@ public class ServiceFactory {
         }
         return patternMatcher;
     }
-    
+
     /**
      * Gets a PatternMatcher instance with default settings (case-sensitive).
      *
@@ -60,7 +63,7 @@ public class ServiceFactory {
     public PatternMatcher getPatternMatcher() {
         return getPatternMatcher(true);
     }
-    
+
     /**
      * Gets a GitLabClient instance.
      *
@@ -72,7 +75,7 @@ public class ServiceFactory {
         }
         return gitLabClient;
     }
-    
+
     /**
      * Gets a MergeRequestService instance.
      *
@@ -84,7 +87,7 @@ public class ServiceFactory {
         }
         return mergeRequestService;
     }
-    
+
     /**
      * Gets a ConflictDetector instance.
      *
@@ -95,5 +98,17 @@ public class ServiceFactory {
             conflictDetector = new MultiMergeRequestConflictDetector(getPatternMatcher());
         }
         return conflictDetector;
+    }
+
+    /**
+     * Gets a ConflictFormatter instance.
+     *
+     * @return the ConflictFormatter instance
+     */
+    public synchronized ConflictFormatter getConflictFormatter() {
+        if (conflictFormatter == null) {
+            conflictFormatter = new DefaultConflictFormatter();
+        }
+        return conflictFormatter;
     }
 }

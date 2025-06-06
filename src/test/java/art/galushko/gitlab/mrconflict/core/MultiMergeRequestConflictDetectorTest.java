@@ -1,8 +1,8 @@
 package art.galushko.gitlab.mrconflict.core;
 
-import art.galushko.gitlab.mrconflict.config.IgnorePatternMatcher;
+import art.galushko.gitlab.mrconflict.di.ServiceFactory;
+import art.galushko.gitlab.mrconflict.formatter.ConflictFormatter;
 import art.galushko.gitlab.mrconflict.model.MergeRequestInfo;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 
@@ -15,12 +15,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class MultiMergeRequestConflictDetectorTest {
 
-    private MultiMergeRequestConflictDetector detector;
-
-    @BeforeEach
-    void setUp() {
-        detector = new MultiMergeRequestConflictDetector(new IgnorePatternMatcher());
-    }
+    private final ConflictDetector detector = ServiceFactory.getInstance().getConflictDetector();
+    private final ConflictFormatter formatter = ServiceFactory.getInstance().getConflictFormatter();
 
     @Test
     @DisplayName("Should detect direct conflicts between MRs targeting same branch")
@@ -166,7 +162,7 @@ class MultiMergeRequestConflictDetectorTest {
         var conflicts = detector.detectConflicts(mergeRequests, List.<String>of());
 
         // When
-        var formatted = detector.formatConflicts(conflicts);
+        var formatted = formatter.formatConflicts(conflicts);
 
         // Then
         assertThat(formatted).isEqualToNormalizingNewlines("""
@@ -210,4 +206,3 @@ class MultiMergeRequestConflictDetectorTest {
         assertThat(conflictingIds).doesNotContain(3);
     }
 }
-

@@ -1,6 +1,7 @@
 package art.galushko.gitlab.mrconflict.core;
 
 import art.galushko.gitlab.mrconflict.di.ServiceFactory;
+import art.galushko.gitlab.mrconflict.formatter.ConflictFormatter;
 import art.galushko.gitlab.mrconflict.gitlab.GitLabClient;
 import art.galushko.gitlab.mrconflict.gitlab.GitLabException;
 import art.galushko.gitlab.mrconflict.gitlab.MergeRequestService;
@@ -18,12 +19,13 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 public class ConflictAnalysisService {
-    
+
     private final ServiceFactory serviceFactory;
     private final GitLabClient gitLabClient;
     private final MergeRequestService mergeRequestService;
     private final ConflictDetector conflictDetector;
-    
+    private final ConflictFormatter conflictFormatter;
+
     /**
      * Creates a new ConflictAnalysisService.
      */
@@ -32,8 +34,9 @@ public class ConflictAnalysisService {
         this.gitLabClient = serviceFactory.getGitLabClient();
         this.mergeRequestService = serviceFactory.getMergeRequestService();
         this.conflictDetector = serviceFactory.getConflictDetector();
+        this.conflictFormatter = serviceFactory.getConflictFormatter();
     }
-    
+
     /**
      * Authenticates with GitLab.
      *
@@ -44,7 +47,7 @@ public class ConflictAnalysisService {
     public void authenticate(String gitlabUrl, String gitlabToken) throws GitLabException {
         gitLabClient.authenticate(gitlabUrl, gitlabToken);
     }
-    
+
     /**
      * Checks if the user has access to the specified project.
      *
@@ -55,7 +58,7 @@ public class ConflictAnalysisService {
     public boolean hasProjectAccess(Long projectId) throws GitLabException {
         return gitLabClient.hasProjectAccess(projectId);
     }
-    
+
     /**
      * Fetches merge requests for conflict analysis.
      *
@@ -66,7 +69,7 @@ public class ConflictAnalysisService {
      */
     public List<MergeRequestInfo> fetchMergeRequests(Long projectId, Long specificMergeRequestIid) 
             throws GitLabException {
-        
+
         if (specificMergeRequestIid != null) {
             // Fetch specific merge request
             log.info("Fetching specific merge request: {}", specificMergeRequestIid);
@@ -78,7 +81,7 @@ public class ConflictAnalysisService {
             return mergeRequestService.getOpenMergeRequests(projectId);
         }
     }
-    
+
     /**
      * Detects conflicts between merge requests.
      *
@@ -90,7 +93,7 @@ public class ConflictAnalysisService {
                                                      List<String> ignorePatterns) {
         return conflictDetector.detectConflicts(mergeRequests, ignorePatterns);
     }
-    
+
     /**
      * Formats conflicts into a human-readable string.
      *
@@ -98,13 +101,9 @@ public class ConflictAnalysisService {
      * @return formatted output
      */
     public String formatConflicts(List<MergeRequestConflict> conflicts) {
-        if (conflicts.isEmpty()) {
-            return "No conflicts detected.";
-        }
-        
-        return conflictDetector.formatConflicts(conflicts);
+        return conflictFormatter.formatConflicts(conflicts);
     }
-    
+
     /**
      * Gets the IDs of merge requests that have conflicts.
      *
@@ -114,7 +113,7 @@ public class ConflictAnalysisService {
     public Set<Integer> getConflictingMergeRequestIds(List<MergeRequestConflict> conflicts) {
         return conflictDetector.getConflictingMergeRequestIds(conflicts);
     }
-    
+
     /**
      * Updates GitLab with conflict information.
      *
@@ -148,7 +147,7 @@ public class ConflictAnalysisService {
             log.warn("Failed to update GitLab with conflict information: {}", e.getMessage());
         }
     }
-    
+
     /**
      * Creates a note on a merge request with conflict information.
      *
@@ -166,7 +165,7 @@ public class ConflictAnalysisService {
                     .collect(Collectors.toList());
 
             if (!relevantConflicts.isEmpty()) {
-                String noteContent = formatConflictNote(relevantConflicts, mergeRequestIid);
+                String noteContent = conflictFormatter.formatConflictNote(relevantConflicts, mergeRequestIid);
 
                 gitLabClient.createMergeRequestNote(projectId, mergeRequestIid, noteContent);
 
@@ -177,45 +176,5 @@ public class ConflictAnalysisService {
             log.warn("Failed to create conflict note for MR {}: {}", mergeRequestIid, e.getMessage());
         }
     }
-    
-    /**
-     * Formats a note with conflict information.
-     *
-     * @param conflicts list of conflicts
-     * @param mergeRequestIid merge request IID
-     * @return formatted note
-     */
-    private String formatConflictNote(List<MergeRequestConflict> conflicts, Long mergeRequestIid) {
-        StringBuilder note = new StringBuilder();
-        note.append("## Merge Request Conflict Analysis\n\n");
-        note.append("This merge request has conflicts with the following merge requests:\n\n");
 
-        for (MergeRequestConflict conflict : conflicts) {
-            MergeRequestInfo otherMr = conflict.firstMr().id() == mergeRequestIid ?
-                    conflict.secondMr() : conflict.firstMr();
-
-            note.append("### Conflict with MR !").append(otherMr.id())
-                    .append(" (").append(otherMr.title()).append(")\n");
-            note.append("- **Source branch:** ").append(otherMr.sourceBranch()).append("\n");
-            note.append("- **Target branch:** ").append(otherMr.targetBranch()).append("\n");
-            note.append("- **Conflict reason:** ").append(conflict.reason()).append("\n");
-            note.append("- **Conflicting files:** ").append(conflict.conflictingFiles().size()).append("\n");
-
-            // List conflicting files (limit to 10 to avoid huge comments)
-            int fileLimit = Math.min(conflict.conflictingFiles().size(), 10);
-            for (int i = 0; i < fileLimit; i++) {
-                note.append("  - `").append(conflict.conflictingFiles().get(i)).append("`\n");
-            }
-
-            if (conflict.conflictingFiles().size() > fileLimit) {
-                note.append("  - ... and ").append(conflict.conflictingFiles().size() - fileLimit)
-                        .append(" more files\n");
-            }
-
-            note.append("\n");
-        }
-
-        note.append("Please resolve these conflicts before merging.\n");
-        return note.toString();
-    }
 }

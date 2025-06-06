@@ -22,14 +22,6 @@ public interface ConflictDetector {
                                               List<String> ignorePatterns);
 
     /**
-     * Formats the conflicts into the required output format.
-     *
-     * @param conflicts list of detected conflicts
-     * @return formatted output string
-     */
-    String formatConflicts(List<MergeRequestConflict> conflicts);
-
-    /**
      * Gets the list of merge request IDs that have conflicts.
      *
      * @param conflicts list of detected conflicts
