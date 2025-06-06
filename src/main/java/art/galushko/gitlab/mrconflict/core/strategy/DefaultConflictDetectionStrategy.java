@@ -7,8 +7,11 @@ import art.galushko.gitlab.mrconflict.model.MergeRequestInfo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Default implementation of the ConflictDetectionStrategy interface.
@@ -25,24 +28,38 @@ public class DefaultConflictDetectionStrategy implements ConflictDetectionStrate
                                                         List<String> ignorePatterns) {
         log.debug("Checking conflict between MR{} and MR{}", mr1.id(), mr2.id());
 
-        // Check if MRs have dependency relationship (indirect conflict rule)
+        // Early termination: Check if MRs have dependency relationship (indirect conflict rule)
         if (hasDependencyRelationship(mr1, mr2)) {
             log.debug("MR{} and MR{} have dependency relationship - no conflict", mr1.id(), mr2.id());
             return Optional.empty();
         }
 
-        // Find common files between the two MRs
-        List<String> commonFiles = mr1.getCommonFiles(mr2);
+        // Early termination: Check if either MR has no changed files
+        if (mr1.changedFiles().isEmpty() || mr2.changedFiles().isEmpty()) {
+            log.debug("Either MR{} or MR{} has no changed files - no conflict", mr1.id(), mr2.id());
+            return Optional.empty();
+        }
 
-        if (commonFiles.isEmpty()) {
+        // Early termination: Check if MRs target completely different parts of the codebase
+        // This is a heuristic check that can be refined based on project structure
+        if (!hasOverlappingCodePaths(mr1, mr2)) {
+            log.debug("MR{} and MR{} target different parts of the codebase - no conflict", mr1.id(), mr2.id());
+            return Optional.empty();
+        }
+
+        // Fast check for common files using the optimized method
+        if (!mr1.hasCommonFiles(mr2)) {
             log.debug("No common files between MR{} and MR{}", mr1.id(), mr2.id());
             return Optional.empty();
         }
 
+        // If we get here, we know there are common files, so get the full list
+        List<String> commonFiles = mr1.getCommonFiles(mr2);
+
         // Filter out ignored files
-        List<String> conflictingFiles = commonFiles.stream()
+        Set<String> conflictingFiles = commonFiles.stream()
                 .filter(file -> !isFileIgnored(file, ignorePatterns))
-                .toList();
+                .collect(Collectors.toSet());
 
         if (conflictingFiles.isEmpty()) {
             log.debug("All common files between MR{} and MR{} are ignored", mr1.id(), mr2.id());
@@ -117,5 +134,72 @@ public class DefaultConflictDetectionStrategy implements ConflictDetectionStrate
 
         return ignorePatterns.stream()
                 .anyMatch(pattern -> ignorePatternMatcher.matches(pattern, filePath));
+    }
+
+
+    /**
+     * Checks if two merge requests have overlapping code paths.
+     * This is a heuristic method that can be used for early termination
+     * when merge requests clearly target different parts of the codebase.
+     *
+     * @param mr1 first merge request
+     * @param mr2 second merge request
+     * @return true if the merge requests have overlapping code paths
+     */
+    private boolean hasOverlappingCodePaths(MergeRequestInfo mr1, MergeRequestInfo mr2) {
+        // If either MR has no files, they can't overlap
+        if (mr1.changedFiles().isEmpty() || mr2.changedFiles().isEmpty()) {
+            return false;
+        }
+
+        // Extract top-level directories from file paths
+        Set<String> mr1TopDirs = getTopLevelDirectories(mr1.changedFiles());
+        Set<String> mr2TopDirs = getTopLevelDirectories(mr2.changedFiles());
+
+        // Check if there's any overlap in top-level directories
+        for (String dir : mr1TopDirs) {
+            if (mr2TopDirs.contains(dir)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Extracts the top-level directories from a set of file paths.
+     *
+     * @param filePaths set of file paths
+     * @return set of top-level directories
+     */
+    private Set<String> getTopLevelDirectories(Set<String> filePaths) {
+        return filePaths.stream()
+                .map(this::extractTopLevelDirectory)
+                .filter(dir -> !dir.isEmpty())
+                .collect(java.util.stream.Collectors.toSet());
+    }
+
+    /**
+     * Extracts the top-level directory from a file path.
+     *
+     * @param filePath file path
+     * @return top-level directory or empty string if none
+     */
+    private String extractTopLevelDirectory(String filePath) {
+        if (filePath == null || filePath.isEmpty()) {
+            return "";
+        }
+
+        // Normalize path separators
+        String normalizedPath = filePath.replace('\\', '/');
+
+        // Extract first directory component
+        int firstSlash = normalizedPath.indexOf('/');
+        if (firstSlash > 0) {
+            return normalizedPath.substring(0, firstSlash);
+        }
+
+        // If no slash, return the whole path (could be a file in root)
+        return normalizedPath;
     }
 }

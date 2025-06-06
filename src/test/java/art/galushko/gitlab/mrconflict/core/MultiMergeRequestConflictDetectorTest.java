@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -26,14 +27,14 @@ class MultiMergeRequestConflictDetectorTest {
                 .id(1)
                 .sourceBranch("feature-auth")
                 .targetBranch("main")
-                .changedFiles(List.of("src/app.js", "tests/unit.test.js"))
+                .changedFiles(Set.of("src/app.js", "tests/unit.test.js"))
                 .build();
 
         var mr2 = MergeRequestInfo.builder()
                 .id(2)
                 .sourceBranch("feature-ui")
                 .targetBranch("main")
-                .changedFiles(List.of("src/app.js", "makefile"))
+                .changedFiles(Set.of("src/app.js", "makefile"))
                 .build();
 
         var mergeRequests = List.of(mr1, mr2);
@@ -58,14 +59,14 @@ class MultiMergeRequestConflictDetectorTest {
                 .id(1)
                 .sourceBranch("feature-auth")
                 .targetBranch("main")
-                .changedFiles(List.of("tests/unit.test.js"))
+                .changedFiles(Set.of("tests/unit.test.js"))
                 .build();
 
         var mr3 = MergeRequestInfo.builder()
                 .id(3)
                 .sourceBranch("hotfix")
                 .targetBranch("feature-auth")
-                .changedFiles(List.of("tests/unit.test.js"))
+                .changedFiles(Set.of("tests/unit.test.js"))
                 .build();
 
         var mergeRequests = List.of(mr1, mr3);
@@ -86,14 +87,14 @@ class MultiMergeRequestConflictDetectorTest {
                 .id(2)
                 .sourceBranch("feature-ui")
                 .targetBranch("main")
-                .changedFiles(List.of("makefile"))
+                .changedFiles(Set.of("makefile"))
                 .build();
 
         var mr7 = MergeRequestInfo.builder()
                 .id(7)
                 .sourceBranch("ignore-update")
                 .targetBranch("main")
-                .changedFiles(List.of("makefile"))
+                .changedFiles(Set.of("makefile"))
                 .build();
 
         var mergeRequests = List.of(mr2, mr7);
@@ -114,14 +115,14 @@ class MultiMergeRequestConflictDetectorTest {
                 .id(5)
                 .sourceBranch("new-values")
                 .targetBranch("feature-auth")
-                .changedFiles(List.of("src/consts.js"))
+                .changedFiles(Set.of("src/consts.js"))
                 .build();
 
         var mr6 = MergeRequestInfo.builder()
                 .id(6)
                 .sourceBranch("const-update")
                 .targetBranch("main")
-                .changedFiles(List.of("src/consts.js"))
+                .changedFiles(Set.of("src/consts.js"))
                 .build();
 
         var mergeRequests = List.of(mr5, mr6);
@@ -147,7 +148,7 @@ class MultiMergeRequestConflictDetectorTest {
                 .title("MR1")
                 .sourceBranch("feature-auth")
                 .targetBranch("main")
-                .changedFiles(List.of("src/app.js"))
+                .changedFiles(Set.of("src/app.js"))
                 .build();
 
         var mr2 = MergeRequestInfo.builder()
@@ -155,7 +156,7 @@ class MultiMergeRequestConflictDetectorTest {
                 .title("MR2")
                 .sourceBranch("feature-ui")
                 .targetBranch("main")
-                .changedFiles(List.of("src/app.js"))
+                .changedFiles(Set.of("src/app.js"))
                 .build();
 
         var mergeRequests = List.of(mr1, mr2);
@@ -178,21 +179,21 @@ class MultiMergeRequestConflictDetectorTest {
                 .id(1)
                 .sourceBranch("feature-auth")
                 .targetBranch("main")
-                .changedFiles(List.of("src/app.js"))
+                .changedFiles(Set.of("src/app.js"))
                 .build();
 
         var mr2 = MergeRequestInfo.builder()
                 .id(2)
                 .sourceBranch("feature-ui")
                 .targetBranch("main")
-                .changedFiles(List.of("src/app.js"))
+                .changedFiles(Set.of("src/app.js"))
                 .build();
 
         var mr3 = MergeRequestInfo.builder()
                 .id(3)
                 .sourceBranch("feature-other")
                 .targetBranch("main")
-                .changedFiles(List.of("other.js"))
+                .changedFiles(Set.of("other.js"))
                 .build();
 
         var mergeRequests = List.of(mr1, mr2, mr3);

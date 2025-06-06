@@ -13,6 +13,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -49,14 +50,14 @@ class DefaultConflictDetectionStrategyTest {
                 .id(1)
                 .sourceBranch("feature-1")
                 .targetBranch("main")
-                .changedFiles(List.of("src/app.js", "src/utils.js"))
+                .changedFiles(Set.of("src/app.js", "src/utils.js"))
                 .build();
 
         var mr2 = MergeRequestInfo.builder()
                 .id(2)
                 .sourceBranch("feature-2")
                 .targetBranch("main")
-                .changedFiles(List.of("src/app.js", "src/config.js"))
+                .changedFiles(Set.of("src/app.js", "src/config.js"))
                 .build();
 
         var ignorePatterns = List.<String>of();
@@ -81,14 +82,14 @@ class DefaultConflictDetectionStrategyTest {
                 .id(1)
                 .sourceBranch("feature-1")
                 .targetBranch("develop")
-                .changedFiles(List.of("src/app.js", "src/utils.js"))
+                .changedFiles(Set.of("src/app.js", "src/utils.js"))
                 .build();
 
         var mr2 = MergeRequestInfo.builder()
                 .id(2)
                 .sourceBranch("feature-2")
                 .targetBranch("main")
-                .changedFiles(List.of("src/app.js", "src/config.js"))
+                .changedFiles(Set.of("src/app.js", "src/config.js"))
                 .build();
 
         var ignorePatterns = List.<String>of();
@@ -113,14 +114,14 @@ class DefaultConflictDetectionStrategyTest {
                 .id(1)
                 .sourceBranch("feature-1")
                 .targetBranch("main")
-                .changedFiles(List.of("src/app.js"))
+                .changedFiles(Set.of("src/app.js"))
                 .build();
 
         var mr2 = MergeRequestInfo.builder()
                 .id(2)
                 .sourceBranch("main")  // mr2 source is mr1 target
                 .targetBranch("release")
-                .changedFiles(List.of("src/app.js"))
+                .changedFiles(Set.of("src/app.js"))
                 .build();
 
         var ignorePatterns = List.<String>of();
@@ -140,14 +141,14 @@ class DefaultConflictDetectionStrategyTest {
                 .id(1)
                 .sourceBranch("feature-1")
                 .targetBranch("main")
-                .changedFiles(List.of("src/app.js"))
+                .changedFiles(Set.of("src/app.js"))
                 .build();
 
         var mr2 = MergeRequestInfo.builder()
                 .id(2)
                 .sourceBranch("feature-2")
                 .targetBranch("main")
-                .changedFiles(List.of("src/utils.js"))
+                .changedFiles(Set.of("src/utils.js"))
                 .build();
 
         var ignorePatterns = List.<String>of();
@@ -167,14 +168,14 @@ class DefaultConflictDetectionStrategyTest {
                 .id(1)
                 .sourceBranch("feature-1")
                 .targetBranch("main")
-                .changedFiles(List.of("src/app.js"))
+                .changedFiles(Set.of("src/app.js"))
                 .build();
 
         var mr2 = MergeRequestInfo.builder()
                 .id(2)
                 .sourceBranch("feature-2")
                 .targetBranch("main")
-                .changedFiles(List.of("src/app.js"))
+                .changedFiles(Set.of("src/app.js"))
                 .build();
 
         var ignorePatterns = List.of("src/app.js");

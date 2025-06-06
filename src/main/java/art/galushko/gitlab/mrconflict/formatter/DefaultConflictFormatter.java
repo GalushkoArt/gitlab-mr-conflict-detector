@@ -4,7 +4,9 @@ import art.galushko.gitlab.mrconflict.model.MergeRequestConflict;
 import art.galushko.gitlab.mrconflict.model.MergeRequestInfo;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -55,8 +57,9 @@ public class DefaultConflictFormatter implements ConflictFormatter {
 
             // List conflicting files (limit to MAX_FILES_IN_NOTE to avoid huge comments)
             int fileLimit = Math.min(conflict.conflictingFiles().size(), MAX_FILES_IN_NOTE);
+            List<String> filesList = new ArrayList<>(conflict.conflictingFiles());
             for (int i = 0; i < fileLimit; i++) {
-                note.append("  - `").append(conflict.conflictingFiles().get(i)).append("`\n");
+                note.append("  - `").append(filesList.get(i)).append("`\n");
             }
 
             if (conflict.conflictingFiles().size() > fileLimit) {
@@ -78,16 +81,16 @@ public class DefaultConflictFormatter implements ConflictFormatter {
      * @return formatted conflict description
      */
     private String formatConflictDescription(MergeRequestConflict conflict) {
-        List<String> conflictingFiles = conflict.conflictingFiles();
+        Set<String> conflictingFiles = conflict.conflictingFiles();
 
         if (conflictingFiles.size() == 1) {
-            return String.format("conflict in modification of `%s`", conflictingFiles.get(0));
+            return String.format("conflict in modification of `%s`", conflictingFiles.iterator().next());
         } else {
             return String.format("conflicts in modification of %d files: %s",
                     conflictingFiles.size(),
                     String.join(", ", conflictingFiles.stream()
                             .map(f -> "`" + f + "`")
-                            .toList()));
+                            .collect(Collectors.toList())));
         }
     }
 

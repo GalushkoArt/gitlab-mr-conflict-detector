@@ -4,7 +4,7 @@ package art.galushko.gitlab.mrconflict.exception;
  * Base exception class for the application.
  * All application-specific exceptions should extend this class.
  */
-public class ApplicationException extends Exception {
+public class ApplicationException extends RuntimeException {
     
     private final ErrorCode errorCode;
     

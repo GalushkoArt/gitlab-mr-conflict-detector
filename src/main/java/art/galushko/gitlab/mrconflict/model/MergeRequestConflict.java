@@ -4,12 +4,13 @@ import lombok.Builder;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Represents a conflict between two merge requests.
  */
 @Builder
-public record MergeRequestConflict(MergeRequestInfo firstMr, MergeRequestInfo secondMr, List<String> conflictingFiles,
+public record MergeRequestConflict(MergeRequestInfo firstMr, MergeRequestInfo secondMr, Set<String> conflictingFiles,
                                    ConflictReason reason) {
 
     @Override

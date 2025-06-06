@@ -248,7 +248,6 @@ This merge request has conflicts with other open merge requests:
 #### Status Updates
 When `--update-mr-status` is enabled, the tool:
 - Adds `conflicts` label to conflicting merge requests
-- Removes `no-conflicts` label if present
 - Provides clear visual indication in GitLab UI
 
 ## 📊 Performance

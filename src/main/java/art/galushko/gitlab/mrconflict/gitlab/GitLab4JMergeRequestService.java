@@ -6,7 +6,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.gitlab4j.api.models.Diff;
 import org.gitlab4j.api.models.MergeRequest;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -33,12 +35,12 @@ public class GitLab4JMergeRequestService implements MergeRequestService {
             return mergeRequests.stream()
                     .map(mr -> {
                         try {
-                            List<String> changedFiles = getChangedFiles(projectId, mr.getIid().longValue());
+                            Set<String> changedFiles = getChangedFiles(projectId, mr.getIid());
                             return convertToMergeRequestInfo(mr, changedFiles);
                         } catch (GitLabException e) {
                             log.warn("Failed to get changed files for MR {}: {}", mr.getIid(), e.getMessage());
-                            // Return MR info with empty file list rather than failing completely
-                            return convertToMergeRequestInfo(mr, List.of());
+                            // Return MR info with empty file set rather than failing completely
+                            return convertToMergeRequestInfo(mr, new HashSet<>());
                         }
                     })
                     .collect(Collectors.toList());
@@ -54,7 +56,7 @@ public class GitLab4JMergeRequestService implements MergeRequestService {
 
         try {
             MergeRequest mergeRequest = gitLabClient.getMergeRequest(projectId, mergeRequestIid);
-            List<String> changedFiles = getChangedFiles(projectId, mergeRequestIid);
+            Set<String> changedFiles = getChangedFiles(projectId, mergeRequestIid);
 
             return convertToMergeRequestInfo(mergeRequest, changedFiles);
 
@@ -65,7 +67,7 @@ public class GitLab4JMergeRequestService implements MergeRequestService {
     }
 
     @Override
-    public List<String> getChangedFiles(Long projectId, Long mergeRequestIid) throws GitLabException {
+    public Set<String> getChangedFiles(Long projectId, Long mergeRequestIid) throws GitLabException {
         log.debug("Fetching changed files for MR {} in project {}", mergeRequestIid, projectId);
 
         // Get the diffs for the merge request
@@ -81,12 +83,11 @@ public class GitLab4JMergeRequestService implements MergeRequestService {
                     return filePath;
                 })
                 .filter(path -> path != null && !path.equals("/dev/null"))
-                .distinct()
-                .collect(Collectors.toList());
+                .collect(Collectors.toSet());
     }
 
     @Override
-    public MergeRequestInfo convertToMergeRequestInfo(MergeRequest mergeRequest, List<String> changedFiles) {
+    public MergeRequestInfo convertToMergeRequestInfo(MergeRequest mergeRequest, Set<String> changedFiles) {
         return MergeRequestInfo.builder()
                 .id(mergeRequest.getIid().intValue())
                 .title(mergeRequest.getTitle())

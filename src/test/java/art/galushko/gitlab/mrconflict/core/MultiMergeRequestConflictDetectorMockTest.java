@@ -13,6 +13,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -42,7 +43,7 @@ class MultiMergeRequestConflictDetectorMockTest {
 
         // Then
         assertThat(detector.getIgnorePatternMatcher()).isSameAs(patternMatcher);
-        
+
         // Test with a simple conflict detection to verify default strategy is used
         var mr1 = createMergeRequest(1);
         var mr2 = createMergeRequest(2);
@@ -55,22 +56,22 @@ class MultiMergeRequestConflictDetectorMockTest {
         // Given
         when(strategy1.getStrategyName()).thenReturn("Strategy1");
         when(strategy2.getStrategyName()).thenReturn("Strategy2");
-        
+
         // When
         var detector = new MultiMergeRequestConflictDetector(patternMatcher, List.of(strategy1, strategy2));
 
         // Then
         assertThat(detector.getIgnorePatternMatcher()).isSameAs(patternMatcher);
-        
+
         // Test with a simple conflict detection to verify both strategies are used
         var mr1 = createMergeRequest(1);
         var mr2 = createMergeRequest(2);
-        
+
         when(strategy1.detectConflict(any(), any(), anyList())).thenReturn(Optional.empty());
         when(strategy2.detectConflict(any(), any(), anyList())).thenReturn(Optional.empty());
-        
+
         detector.detectConflicts(List.of(mr1, mr2), List.of());
-        
+
         verify(strategy1).detectConflict(eq(mr1), eq(mr2), anyList());
         verify(strategy2).detectConflict(eq(mr1), eq(mr2), anyList());
     }
@@ -83,7 +84,7 @@ class MultiMergeRequestConflictDetectorMockTest {
 
         // Then
         assertThat(detector.getIgnorePatternMatcher()).isSameAs(patternMatcher);
-        
+
         // Test with a simple conflict detection to verify default strategy is used
         var mr1 = createMergeRequest(1);
         var mr2 = createMergeRequest(2);
@@ -96,22 +97,22 @@ class MultiMergeRequestConflictDetectorMockTest {
         // Given
         when(strategy1.getStrategyName()).thenReturn("Strategy1");
         when(strategy2.getStrategyName()).thenReturn("Strategy2");
-        
+
         var detector = new MultiMergeRequestConflictDetector(patternMatcher, List.of(strategy1));
-        
+
         // When
         detector.addStrategy(strategy2);
-        
+
         // Then
         // Test with a simple conflict detection to verify both strategies are used
         var mr1 = createMergeRequest(1);
         var mr2 = createMergeRequest(2);
-        
+
         when(strategy1.detectConflict(any(), any(), anyList())).thenReturn(Optional.empty());
         when(strategy2.detectConflict(any(), any(), anyList())).thenReturn(Optional.empty());
-        
+
         detector.detectConflicts(List.of(mr1, mr2), List.of());
-        
+
         verify(strategy1).detectConflict(eq(mr1), eq(mr2), anyList());
         verify(strategy2).detectConflict(eq(mr1), eq(mr2), anyList());
     }
@@ -122,27 +123,27 @@ class MultiMergeRequestConflictDetectorMockTest {
         // Given
         when(strategy1.getStrategyName()).thenReturn("Strategy1");
         when(strategy2.getStrategyName()).thenReturn("Strategy2");
-        
+
         var detector = new MultiMergeRequestConflictDetector(patternMatcher, List.of(strategy1, strategy2));
-        
+
         var mr1 = createMergeRequest(1);
         var mr2 = createMergeRequest(2);
         var mr3 = createMergeRequest(3);
-        
+
         var conflict1 = createConflict(mr1, mr2);
         var conflict2 = createConflict(mr2, mr3);
-        
+
         when(strategy1.detectConflict(eq(mr1), eq(mr2), anyList())).thenReturn(Optional.of(conflict1));
         when(strategy1.detectConflict(eq(mr1), eq(mr3), anyList())).thenReturn(Optional.empty());
         when(strategy1.detectConflict(eq(mr2), eq(mr3), anyList())).thenReturn(Optional.empty());
-        
+
         when(strategy2.detectConflict(eq(mr1), eq(mr2), anyList())).thenReturn(Optional.empty());
         when(strategy2.detectConflict(eq(mr1), eq(mr3), anyList())).thenReturn(Optional.empty());
         when(strategy2.detectConflict(eq(mr2), eq(mr3), anyList())).thenReturn(Optional.of(conflict2));
-        
+
         // When
         var conflicts = detector.detectConflicts(List.of(mr1, mr2, mr3), List.of());
-        
+
         // Then
         assertThat(conflicts).hasSize(2);
         assertThat(conflicts).contains(conflict1, conflict2);
@@ -153,7 +154,7 @@ class MultiMergeRequestConflictDetectorMockTest {
                 .id(id)
                 .sourceBranch("feature-" + id)
                 .targetBranch("main")
-                .changedFiles(List.of("file" + id + ".txt"))
+                .changedFiles(Set.of("file" + id + ".txt"))
                 .build();
     }
 
@@ -161,7 +162,7 @@ class MultiMergeRequestConflictDetectorMockTest {
         return MergeRequestConflict.builder()
                 .firstMr(mr1)
                 .secondMr(mr2)
-                .conflictingFiles(List.of("common.txt"))
+                .conflictingFiles(Set.of("common.txt"))
                 .build();
     }
 }

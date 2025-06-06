@@ -147,7 +147,7 @@ class ConflictAnalysisServiceTest {
             MergeRequestConflict.builder()
                 .firstMr(mrs.get(0))
                 .secondMr(mrs.get(1))
-                .conflictingFiles(List.of("file.txt"))
+                .conflictingFiles(Set.of("file.txt"))
                 .build()
         );
 
@@ -169,7 +169,7 @@ class ConflictAnalysisServiceTest {
             MergeRequestConflict.builder()
                 .firstMr(MergeRequestInfo.builder().id(1).build())
                 .secondMr(MergeRequestInfo.builder().id(2).build())
-                .conflictingFiles(List.of("file.txt"))
+                .conflictingFiles(Set.of("file.txt"))
                 .build()
         );
 
@@ -192,7 +192,7 @@ class ConflictAnalysisServiceTest {
             MergeRequestConflict.builder()
                 .firstMr(MergeRequestInfo.builder().id(1).build())
                 .secondMr(MergeRequestInfo.builder().id(2).build())
-                .conflictingFiles(List.of("file.txt"))
+                .conflictingFiles(Set.of("file.txt"))
                 .build()
         );
 
@@ -218,7 +218,7 @@ class ConflictAnalysisServiceTest {
             MergeRequestConflict.builder()
                 .firstMr(MergeRequestInfo.builder().id(1).title("MR1").build())
                 .secondMr(MergeRequestInfo.builder().id(2).title("MR2").build())
-                .conflictingFiles(List.of("file.txt"))
+                .conflictingFiles(Set.of("file.txt"))
                 .build()
         );
 

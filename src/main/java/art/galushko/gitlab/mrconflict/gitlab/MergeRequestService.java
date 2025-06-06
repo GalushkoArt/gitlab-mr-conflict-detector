@@ -4,6 +4,7 @@ import art.galushko.gitlab.mrconflict.model.MergeRequestInfo;
 import org.gitlab4j.api.models.MergeRequest;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * Service for fetching merge request data from GitLab API.
@@ -44,18 +45,17 @@ public interface MergeRequestService {
      *
      * @param projectId GitLab project ID
      * @param mergeRequestIid merge request internal ID
-     * @return list of changed file paths
+     * @return set of changed file paths
      * @throws GitLabException if changed files cannot be fetched
      */
-    List<String> getChangedFiles(Long projectId, Long mergeRequestIid) throws GitLabException;
+    Set<String> getChangedFiles(Long projectId, Long mergeRequestIid) throws GitLabException;
 
     /**
      * Converts GitLab4J MergeRequest to our MergeRequestInfo model.
      *
      * @param mergeRequest GitLab4J merge request
-     * @param changedFiles list of changed files
+     * @param changedFiles set of changed files
      * @return converted merge request info
      */
-    MergeRequestInfo convertToMergeRequestInfo(MergeRequest mergeRequest, List<String> changedFiles);
+    MergeRequestInfo convertToMergeRequestInfo(MergeRequest mergeRequest, Set<String> changedFiles);
 }
-
