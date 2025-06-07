@@ -11,9 +11,11 @@ import art.galushko.gitlab.mrconflict.security.CredentialService;
 import art.galushko.gitlab.mrconflict.security.InputValidator;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.toSet;
 
 /**
  * Service for analyzing merge request conflicts.
@@ -22,19 +24,20 @@ import java.util.stream.Collectors;
 @Slf4j
 public class ConflictAnalysisService {
 
-    private final ServiceFactory serviceFactory;
     private final GitLabClient gitLabClient;
     private final MergeRequestService mergeRequestService;
     private final ConflictDetector conflictDetector;
     private final ConflictFormatter conflictFormatter;
     private final CredentialService credentialService;
     private final InputValidator inputValidator;
+    private static final String CONFLICTS_LABEL = "conflicts";
+    private static final String CONFLICT_LABEL_PREFIX = "conflict:MR";
 
     /**
      * Creates a new ConflictAnalysisService.
      */
     public ConflictAnalysisService() {
-        this.serviceFactory = ServiceFactory.getInstance();
+        var serviceFactory = ServiceFactory.getInstance();
         this.gitLabClient = serviceFactory.getGitLabClient();
         this.mergeRequestService = serviceFactory.getMergeRequestService();
         this.conflictDetector = serviceFactory.getConflictDetector();
@@ -47,7 +50,7 @@ public class ConflictAnalysisService {
      * Authenticates with GitLab.
      * Supports reading credentials from environment variables.
      *
-     * @param gitlabUrl GitLab instance URL
+     * @param gitlabUrl   GitLab instance URL
      * @param gitlabToken GitLab personal access token
      * @throws GitLabException if authentication fails
      */
@@ -81,12 +84,12 @@ public class ConflictAnalysisService {
     /**
      * Fetches merge requests for conflict analysis.
      *
-     * @param projectId GitLab project ID
+     * @param projectId               GitLab project ID
      * @param specificMergeRequestIid specific merge request IID (optional)
      * @return list of merge requests
      * @throws GitLabException if merge requests cannot be fetched
      */
-    public List<MergeRequestInfo> fetchMergeRequests(Long projectId, Long specificMergeRequestIid) 
+    public List<MergeRequestInfo> fetchMergeRequests(Long projectId, Long specificMergeRequestIid)
             throws GitLabException {
 
         // Validate project ID
@@ -124,12 +127,12 @@ public class ConflictAnalysisService {
     /**
      * Detects conflicts between merge requests.
      *
-     * @param mergeRequests list of merge requests to analyze
+     * @param mergeRequests  list of merge requests to analyze
      * @param ignorePatterns patterns for files/directories to ignore
      * @return list of detected conflicts
      */
-    public List<MergeRequestConflict> detectConflicts(List<MergeRequestInfo> mergeRequests, 
-                                                     List<String> ignorePatterns) {
+    public List<MergeRequestConflict> detectConflicts(List<MergeRequestInfo> mergeRequests,
+                                                      List<String> ignorePatterns) {
         return conflictDetector.detectConflicts(mergeRequests, ignorePatterns);
     }
 
@@ -149,71 +152,129 @@ public class ConflictAnalysisService {
      * @param conflicts list of conflicts
      * @return set of merge request IDs
      */
-    public Set<Integer> getConflictingMergeRequestIds(List<MergeRequestConflict> conflicts) {
+    public Set<Long> getConflictingMergeRequestIds(List<MergeRequestConflict> conflicts) {
         return conflictDetector.getConflictingMergeRequestIds(conflicts);
     }
 
     /**
      * Updates GitLab with conflict information.
      *
-     * @param projectId GitLab project ID
-     * @param conflictingMrIds IDs of merge requests with conflicts
-     * @param conflicts list of conflicts
-     * @param createNotes whether to create notes on merge requests
-     * @param updateStatus whether to update merge request status
-     * @param dryRun whether to perform a dry run (no changes)
+     * @param projectId    GitLab project ID
+     * @param conflicts    list of conflicts
+     * @param createNotes  whether to create notes on merge requests
+     * @param updateStatus whether to update the merge request status
+     * @param dryRun       whether to perform a dry run (no changes)
      */
-    public void updateGitLabWithConflicts(Long projectId, Set<Integer> conflictingMrIds,
-                                         List<MergeRequestConflict> conflicts,
-                                         boolean createNotes, boolean updateStatus, boolean dryRun) {
-        if (dryRun) {
-            log.info("Dry run mode - skipping GitLab updates");
-            return;
-        }
+    public void updateGitLabWithConflicts(Long projectId,
+                                          List<MergeRequestConflict> conflicts,
+                                          boolean createNotes, boolean updateStatus, boolean dryRun) {
 
         try {
-            for (Integer mrId : conflictingMrIds) {
-                if (createNotes) {
-                    createConflictNote(projectId, mrId.longValue(), conflicts);
+            for (var mergeRequest : mergeRequestService.getMergeRequests(projectId, "opened")) {
+                final long mrId = mergeRequest.id();
+
+                // Find all conflicts involving this MR
+                final List<MergeRequestConflict> relevantConflicts = findConflictsForMr(conflicts, mrId);
+                final Set<Long> conflictingMrIds = extractConflictingMrIds(relevantConflicts, mrId);
+
+                // Get current MR details and labels
+                final var labels = new HashSet<>(mergeRequest.labels());
+                final var originalLabels = new HashSet<>(labels);
+
+                // Update labels based on conflict status
+                if (relevantConflicts.isEmpty()) {
+                    labels.remove(CONFLICTS_LABEL);
+                    labels.removeIf(label -> label.startsWith(CONFLICT_LABEL_PREFIX));
+                } else {
+                    labels.add(CONFLICTS_LABEL);
+                    final Set<String> newConflictLabels = conflictingMrIds.stream()
+                            .map(id -> CONFLICT_LABEL_PREFIX + id)
+                            .collect(toSet());
+
+                    labels.removeIf(label -> label.startsWith(CONFLICT_LABEL_PREFIX));
+
+                    labels.addAll(newConflictLabels);
                 }
 
-                if (updateStatus) {
-                    gitLabClient.updateMergeRequestStatus(projectId, mrId.longValue(), true);
+                // Apply changes if labels were modified
+                if (labelsHaveChanged(originalLabels, labels)) {
+                    final Set<String> resolvedConflictLabels = findResolvedConflictLabels(originalLabels, labels);
+                    log.info("""
+                            Updating labels for MR {} in project {}:
+                            Current labels: {}
+                            Resolved labels: {}""", mergeRequest.title(), projectId, labels, resolvedConflictLabels);
+
+                    if (updateStatus && !dryRun) {
+                        gitLabClient.updateMergeRequestStatus(projectId, mrId, labels);
+                    }
+
+                    if (createNotes && !dryRun) {
+                        createConflictNote(projectId, mrId, relevantConflicts, resolvedConflictLabels);
+                    }
                 }
             }
 
         } catch (Exception e) {
-            log.warn("Failed to update GitLab with conflict information: {}", e.getMessage());
+            log.error("Failed to update GitLab with conflict information: {}", e.getMessage());
         }
     }
 
     /**
      * Creates a note on a merge request with conflict information.
      *
-     * @param projectId GitLab project ID
-     * @param mergeRequestIid merge request IID
-     * @param conflicts list of conflicts
+     * @param projectId         GitLab project ID
+     * @param mergeRequestIid   merge request IID
+     * @param conflicts         list of conflicts
+     * @param resolvedConflicts list of resolved conflicts (labels)
      */
-    private void createConflictNote(Long projectId, Long mergeRequestIid,
-                                   List<MergeRequestConflict> conflicts) {
+    private void createConflictNote(Long projectId, Long mergeRequestIid, List<MergeRequestConflict> conflicts, Set<String> resolvedConflicts) {
         try {
-            // Find conflicts involving this MR
-            var relevantConflicts = conflicts.stream()
-                    .filter(conflict -> conflict.firstMr().id() == mergeRequestIid ||
-                            conflict.secondMr().id() == mergeRequestIid)
-                    .collect(Collectors.toList());
+            var resolvedConflictMrs = resolvedConflicts.stream()
+                    .map(label -> label.replaceFirst("conflict:MR", ""))
+                    .map(Long::parseLong)
+                    .map(iid -> gitLabClient.getMergeRequest(projectId, iid))
+                    .toList();
+            var noteContent = conflictFormatter.formatConflictNote(conflicts, mergeRequestIid, resolvedConflictMrs);
 
-            if (!relevantConflicts.isEmpty()) {
-                String noteContent = conflictFormatter.formatConflictNote(relevantConflicts, mergeRequestIid);
+            gitLabClient.createMergeRequestNote(projectId, mergeRequestIid, noteContent);
 
-                gitLabClient.createMergeRequestNote(projectId, mergeRequestIid, noteContent);
-
-                log.info("Created conflict note for MR {} in project {}", mergeRequestIid, projectId);
-            }
-
+            log.info("Created conflict note for MR {} in project {}", mergeRequestIid, projectId);
         } catch (Exception e) {
-            log.warn("Failed to create conflict note for MR {}: {}", mergeRequestIid, e.getMessage());
+            log.error("Failed to create conflict note for MR {}: {}", mergeRequestIid, e.getMessage());
         }
+    }
+
+    private List<MergeRequestConflict> findConflictsForMr(List<MergeRequestConflict> conflicts, long mrId) {
+        return conflicts.stream()
+                .filter(conflict -> isInvolvedInConflict(conflict, mrId))
+                .toList();
+    }
+
+    private boolean isInvolvedInConflict(MergeRequestConflict conflict, long mrId) {
+        return conflict.firstMr().id() == mrId || conflict.secondMr().id() == mrId;
+    }
+
+    private Set<Long> extractConflictingMrIds(List<MergeRequestConflict> conflicts, long mrId) {
+        return conflicts.stream()
+                .map(conflict -> getOtherMrId(conflict, mrId))
+                .collect(toSet());
+    }
+
+    private long getOtherMrId(MergeRequestConflict conflict, long mrId) {
+        return conflict.firstMr().id() == mrId ?
+                conflict.secondMr().id() :
+                conflict.firstMr().id();
+    }
+
+    private boolean labelsHaveChanged(Set<String> originalLabels, Set<String> newLabels) {
+        return !originalLabels.equals(newLabels);
+    }
+
+    private Set<String> findResolvedConflictLabels(Set<String> originalLabels, Set<String> newLabels) {
+        return originalLabels.stream()
+                .filter(label -> label.startsWith(CONFLICT_LABEL_PREFIX))
+                .filter(label -> !newLabels.contains(label))
+                .collect(toSet());
     }
 
 }

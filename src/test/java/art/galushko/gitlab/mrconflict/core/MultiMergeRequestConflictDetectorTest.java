@@ -3,8 +3,8 @@ package art.galushko.gitlab.mrconflict.core;
 import art.galushko.gitlab.mrconflict.di.ServiceFactory;
 import art.galushko.gitlab.mrconflict.formatter.ConflictFormatter;
 import art.galushko.gitlab.mrconflict.model.MergeRequestInfo;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Set;
@@ -45,7 +45,7 @@ class MultiMergeRequestConflictDetectorTest {
 
         // Then
         assertThat(conflicts).hasSize(1);
-        var conflict = conflicts.get(0);
+        var conflict = conflicts.getFirst();
         assertThat(conflict.firstMr().id()).isEqualTo(1);
         assertThat(conflict.secondMr().id()).isEqualTo(2);
         assertThat(conflict.conflictingFiles()).containsExactly("src/app.js");
@@ -133,7 +133,7 @@ class MultiMergeRequestConflictDetectorTest {
 
         // Then
         assertThat(conflicts).hasSize(1);
-        var conflict = conflicts.get(0);
+        var conflict = conflicts.getFirst();
         assertThat(conflict.firstMr().id()).isEqualTo(5);
         assertThat(conflict.secondMr().id()).isEqualTo(6);
         assertThat(conflict.conflictingFiles()).containsExactly("src/consts.js");
@@ -203,7 +203,7 @@ class MultiMergeRequestConflictDetectorTest {
         var conflictingIds = detector.getConflictingMergeRequestIds(conflicts);
 
         // Then
-        assertThat(conflictingIds).containsExactlyInAnyOrder(1, 2);
-        assertThat(conflictingIds).doesNotContain(3);
+        assertThat(conflictingIds).containsExactlyInAnyOrder(1L, 2L);
+        assertThat(conflictingIds).doesNotContain(3L);
     }
 }

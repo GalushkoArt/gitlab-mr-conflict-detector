@@ -13,25 +13,22 @@ public interface GitLabProjectClient {
      *
      * @param projectId GitLab project ID
      * @return project information
-     * @throws GitLabException if project cannot be retrieved
      */
-    Project getProject(Long projectId) throws GitLabException;
+    Project getProject(Long projectId);
     
     /**
      * Gets a project by its path (namespace/project-name).
      *
      * @param projectPath project path
      * @return project information
-     * @throws GitLabException if project cannot be retrieved
      */
-    Project getProject(String projectPath) throws GitLabException;
+    Project getProject(String projectPath);
     
     /**
      * Gets the default branch for a project.
      *
      * @param projectId GitLab project ID
      * @return default branch name
-     * @throws GitLabException if default branch cannot be determined
      */
-    String getDefaultBranch(Long projectId) throws GitLabException;
+    String getDefaultBranch(Long projectId);
 }

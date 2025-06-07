@@ -1,6 +1,7 @@
 package art.galushko.gitlab.mrconflict.security;
 
 import lombok.extern.slf4j.Slf4j;
+
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.regex.Pattern;
@@ -39,7 +40,7 @@ public class InputValidator {
             URI uri = new URI(url);
             return uri.getScheme() != null && (uri.getScheme().equals("http") || uri.getScheme().equals("https"));
         } catch (URISyntaxException e) {
-            log.warn("Invalid GitLab URL format: {}", url);
+            log.error("Invalid GitLab URL format: {}", url);
             return false;
         }
     }
@@ -103,21 +104,5 @@ public class InputValidator {
         }
         
         return result;
-    }
-
-    /**
-     * Sanitizes user input to prevent injection attacks.
-     * Removes potentially dangerous characters.
-     *
-     * @param input the input to sanitize
-     * @return the sanitized input
-     */
-    public String sanitizeInput(String input) {
-        if (input == null) {
-            return null;
-        }
-        
-        // Remove control characters and other potentially dangerous characters
-        return input.replaceAll("[\\p{Cntrl}\\<\\>\\(\\)\\{\\}\\[\\]\\\\\\^\\$\\|]", "");
     }
 }

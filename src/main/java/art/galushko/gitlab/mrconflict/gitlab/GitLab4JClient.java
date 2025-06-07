@@ -13,13 +13,14 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import static art.galushko.gitlab.mrconflict.utils.CollectionUtils.mapCollection;
 import static art.galushko.gitlab.mrconflict.utils.ThrowingFunction.wrap;
 
 /**
- * GitLab4J-based implementation of GitLabClient interface.
+ * GitLab4J-based implementation of the GitLabClient interface.
  */
 @Slf4j
 public class GitLab4JClient implements GitLabClient {
@@ -38,6 +39,7 @@ public class GitLab4JClient implements GitLabClient {
     private final Cache<String, List<MergeRequest>> mergeRequestsCache;
     private final Cache<String, MergeRequest> mergeRequestCache;
     private final Cache<String, List<Diff>> mergeRequestChangesCache;
+    private final Cache<String, User> currentUseCache;
 
     /**
      * Creates a new GitLab4JClient with security services.
@@ -74,6 +76,10 @@ public class GitLab4JClient implements GitLabClient {
         this.mergeRequestChangesCache = Caffeine.newBuilder()
                 .expireAfterWrite(DEFAULT_CACHE_TTL_SECONDS, TimeUnit.SECONDS)
                 .build();
+
+        this.currentUseCache = Caffeine.newBuilder()
+                .expireAfterWrite(DEFAULT_CACHE_TTL_SECONDS, TimeUnit.SECONDS)
+                .build();
     }
 
     /**
@@ -87,6 +93,8 @@ public class GitLab4JClient implements GitLabClient {
         protectedBranchesCache.invalidateAll();
         mergeRequestsCache.invalidateAll();
         mergeRequestCache.invalidateAll();
+        mergeRequestChangesCache.invalidateAll();
+        currentUseCache.invalidateAll();
     }
 
     @Override
@@ -109,14 +117,22 @@ public class GitLab4JClient implements GitLabClient {
             this.gitLabApi = new GitLabApi(url, token);
 
             // Test authentication by getting current user
-            var currentUser = gitLabApi.getUserApi().getCurrentUser();
+            var currentUser = getCurrentUser();
             log.info("Successfully authenticated as user: {} ({})", currentUser.getUsername(), currentUser.getName());
 
             return this;
-        } catch (GitLabApiException e) {
+        } catch (RuntimeException e) {
             // Sanitize error message to remove token if present
             String sanitizedMessage = credentialService.sanitizeErrorMessage(e.getMessage(), accessToken);
             throw new GitLabException("Failed to authenticate with GitLab: " + sanitizedMessage, e);
+        }
+    }
+
+    private User getCurrentUser() throws GitLabException {
+        try {
+            return currentUseCache.get("user", wrap(id -> gitLabApi.getUserApi().getCurrentUser()));
+        } catch (RuntimeException e) {
+            throw new GitLabException("Failed to get current user", e);
         }
     }
 
@@ -213,40 +229,20 @@ public class GitLab4JClient implements GitLabClient {
     }
 
     @Override
-    public void updateMergeRequestStatus(Long projectId, Long mergeRequestIid, boolean hasConflicts)
-            throws GitLabException {
+    public void updateMergeRequestStatus(Long projectId, Long mergeRequestIid, Set<String> labels) {
         try {
             // Note: GitLab doesn't allow direct status updates via API for conflict detection
             // This would typically be handled by GitLab's built-in conflict detection
             // We can add labels or update description instead
+            log.debug("Updating labels for merge request IID: {} of project ID: {}", mergeRequestIid, projectId);
 
-            // Get merge request (will use cache if available)
-            var mr = getMergeRequest(projectId, mergeRequestIid);
-            var labels = mr.getLabels();
-            boolean labelsChanged = false;
+            // Update the merge request with new labels
+            var updatedMr = gitLabApi.getMergeRequestApi().updateMergeRequest(projectId, mergeRequestIid,
+                    null, null, null, null, null, String.join(",", labels), null, null, null, null, null);
 
-            if (hasConflicts && !labels.contains("conflicts")) {
-                labels.add("conflicts");
-                labelsChanged = true;
-            } else if (!hasConflicts && labels.contains("conflicts")) {
-                labels.remove("conflicts");
-                labelsChanged = true;
-            }
-
-            // Only update if labels have changed
-            if (labelsChanged) {
-                log.debug("Updating labels for merge request IID: {} of project ID: {}", mergeRequestIid, projectId);
-
-                // Update the merge request with new labels
-                var updatedMr = gitLabApi.getMergeRequestApi().updateMergeRequest(projectId, mergeRequestIid,
-                        null, null, null, null, null, String.join(",", labels), null, null, null, null, null);
-
-                // Update cache with the updated merge request
-                mergeRequestCache.put(getMrCacheKey(projectId, mergeRequestIid), updatedMr);
-                log.debug("Updated MR {} labels based on conflict status", mergeRequestIid);
-            } else {
-                log.debug("No label changes needed for merge request IID: {} of project ID: {}", mergeRequestIid, projectId);
-            }
+            // Update cache with the updated merge request
+            mergeRequestCache.put(getMrCacheKey(projectId, mergeRequestIid), updatedMr);
+            log.debug("Updated MR {} labels based on conflict status", mergeRequestIid);
 
         } catch (GitLabApiException e) {
             throw new GitLabException("Failed to update merge request status", e);
@@ -310,9 +306,7 @@ public class GitLab4JClient implements GitLabClient {
                 throw new GitLabException("Note content cannot be empty");
             }
 
-            // Sanitize note content to prevent injection attacks
-            gitLabApi.getNotesApi()
-                    .createMergeRequestNote(projectId, mergeRequestIid, inputValidator.sanitizeInput(noteContent));
+            gitLabApi.getNotesApi().createMergeRequestNote(projectId, mergeRequestIid, noteContent);
         } catch (GitLabApiException e) {
             throw new GitLabException("Failed to create note for MR " + mergeRequestIid, e);
         }

@@ -11,17 +11,15 @@ public interface GitLabAuthenticationClient {
      *
      * @param gitlabUrl   GitLab instance URL
      * @param accessToken personal access token
-     * @return the authenticated client
-     * @throws GitLabException if authentication fails
+     * @return an authenticated client
      */
-    GitLabClient authenticate(String gitlabUrl, String accessToken) throws GitLabException;
+    GitLabClient authenticate(String gitlabUrl, String accessToken);
     
     /**
      * Checks if the current user has permission to access the project.
      *
      * @param projectId GitLab project ID
-     * @return true if user has access
-     * @throws GitLabException if permission check fails
+     * @return true if the user has access
      */
-    boolean hasProjectAccess(Long projectId) throws GitLabException;
+    boolean hasProjectAccess(Long projectId);
 }

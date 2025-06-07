@@ -19,7 +19,6 @@ import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -105,7 +104,7 @@ class ConflictAnalysisServiceTest {
 
         // Then
         assertThat(result).hasSize(1);
-        assertThat(result.get(0)).isEqualTo(mr);
+        assertThat(result.getFirst()).isEqualTo(mr);
         verify(mergeRequestService).getMergeRequest(projectId, mrIid);
         verify(mergeRequestService, never()).getOpenMergeRequests(any());
     }
@@ -196,11 +195,11 @@ class ConflictAnalysisServiceTest {
                 .build()
         );
 
-        Set<Integer> conflictingIds = Set.of(1, 2);
+        Set<Long> conflictingIds = Set.of(1L, 2L);
         when(conflictDetector.getConflictingMergeRequestIds(conflicts)).thenReturn(conflictingIds);
 
         // When
-        Set<Integer> result = service.getConflictingMergeRequestIds(conflicts);
+        Set<Long> result = service.getConflictingMergeRequestIds(conflicts);
 
         // Then
         assertThat(result).isEqualTo(conflictingIds);
@@ -212,7 +211,6 @@ class ConflictAnalysisServiceTest {
     void shouldUpdateGitLabWithConflicts() throws GitLabException {
         // Given
         Long projectId = 123L;
-        Set<Integer> conflictingMrIds = Set.of(1, 2);
 
         List<MergeRequestConflict> conflicts = List.of(
             MergeRequestConflict.builder()
@@ -223,17 +221,22 @@ class ConflictAnalysisServiceTest {
         );
 
         String noteContent = "Conflict note";
-        when(conflictFormatter.formatConflictNote(anyList(), eq(1L))).thenReturn(noteContent);
-        when(conflictFormatter.formatConflictNote(anyList(), eq(2L))).thenReturn(noteContent);
+        when(conflictFormatter.formatConflictNote(anyList(), eq(1L), anyList())).thenReturn(noteContent);
+        when(conflictFormatter.formatConflictNote(anyList(), eq(2L), anyList())).thenReturn(noteContent);
+        when(mergeRequestService.getMergeRequests(projectId, "opened")).thenReturn(List.of(
+                MergeRequestInfo.builder().id(1L).labels(Set.of()).build(),
+                MergeRequestInfo.builder().id(2L).labels(Set.of()).build()
+        ));
 
         // When
-        service.updateGitLabWithConflicts(projectId, conflictingMrIds, conflicts, true, true, false);
+        service.updateGitLabWithConflicts(projectId, conflicts, true, true, false);
 
         // Then
         verify(gitLabClient).createMergeRequestNote(projectId, 1L, noteContent);
         verify(gitLabClient).createMergeRequestNote(projectId, 2L, noteContent);
-        verify(gitLabClient).updateMergeRequestStatus(projectId, 1L, true);
-        verify(gitLabClient).updateMergeRequestStatus(projectId, 2L, true);
+        // Verify with the new method signature that includes conflicting MR IDs and skipRepeatedConflicts
+        verify(gitLabClient).updateMergeRequestStatus(projectId, 1L, Set.of("conflicts", "conflict:MR2"));
+        verify(gitLabClient).updateMergeRequestStatus(projectId, 2L, Set.of("conflicts", "conflict:MR1"));
     }
 
     @Test
@@ -245,11 +248,11 @@ class ConflictAnalysisServiceTest {
         List<MergeRequestConflict> conflicts = List.of();
 
         // When
-        service.updateGitLabWithConflicts(projectId, conflictingMrIds, conflicts, true, true, true);
+        service.updateGitLabWithConflicts(projectId, conflicts, true, true, true);
 
         // Then
         verify(gitLabClient, never()).createMergeRequestNote(any(), any(), any());
-        verify(gitLabClient, never()).updateMergeRequestStatus(any(), any(), anyBoolean());
+        verify(gitLabClient, never()).updateMergeRequestStatus(any(), any(), any());
     }
 
     @Test
@@ -261,6 +264,6 @@ class ConflictAnalysisServiceTest {
         List<MergeRequestConflict> conflicts = List.of();
 
         // When & Then - should not throw exception
-        service.updateGitLabWithConflicts(projectId, conflictingMrIds, conflicts, true, false, false);
+        service.updateGitLabWithConflicts(projectId, conflicts, true, false, false);
     }
 }

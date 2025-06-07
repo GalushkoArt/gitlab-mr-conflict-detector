@@ -3,7 +3,6 @@ package art.galushko.gitlab.mrconflict.gitlab;
 import art.galushko.gitlab.mrconflict.model.MergeRequestInfo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.gitlab4j.api.models.Diff;
 import org.gitlab4j.api.models.MergeRequest;
 
 import java.util.HashSet;
@@ -30,20 +29,19 @@ public class GitLab4JMergeRequestService implements MergeRequestService {
         log.info("Fetching merge requests for project {} with state: {}", projectId, state);
 
         try {
-            List<MergeRequest> mergeRequests = gitLabClient.getMergeRequests(projectId, state);
+            var mergeRequests = gitLabClient.getMergeRequests(projectId, state);
 
             return mergeRequests.stream()
                     .map(mr -> {
                         try {
-                            Set<String> changedFiles = getChangedFiles(projectId, mr.getIid());
+                            var changedFiles = getChangedFiles(projectId, mr.getIid());
                             return convertToMergeRequestInfo(mr, changedFiles);
                         } catch (GitLabException e) {
-                            log.warn("Failed to get changed files for MR {}: {}", mr.getIid(), e.getMessage());
-                            // Return MR info with empty file set rather than failing completely
-                            return convertToMergeRequestInfo(mr, new HashSet<>());
+                            log.error("Failed to get changed files for MR {}: {}", mr.getIid(), e.getMessage());
+                            throw new GitLabException("Failed to get changed files for MR " + mr.getIid(), e);
                         }
                     })
-                    .collect(Collectors.toList());
+                    .toList();
 
         } catch (Exception e) {
             throw new GitLabException("Failed to fetch merge requests for project: " + projectId, e);
@@ -55,8 +53,8 @@ public class GitLab4JMergeRequestService implements MergeRequestService {
         log.debug("Fetching merge request {} for project {}", mergeRequestIid, projectId);
 
         try {
-            MergeRequest mergeRequest = gitLabClient.getMergeRequest(projectId, mergeRequestIid);
-            Set<String> changedFiles = getChangedFiles(projectId, mergeRequestIid);
+            var mergeRequest = gitLabClient.getMergeRequest(projectId, mergeRequestIid);
+            var changedFiles = getChangedFiles(projectId, mergeRequestIid);
 
             return convertToMergeRequestInfo(mergeRequest, changedFiles);
 
@@ -71,29 +69,48 @@ public class GitLab4JMergeRequestService implements MergeRequestService {
         log.debug("Fetching changed files for MR {} in project {}", mergeRequestIid, projectId);
 
         // Get the diffs for the merge request
-        List<Diff> diffs = gitLabClient.getMergeRequestChanges(projectId, mergeRequestIid);
+        var diffs = gitLabClient.getMergeRequestChanges(projectId, mergeRequestIid);
 
-        return diffs.stream()
-                .map(diff -> {
-                    // Use new_path if available (for new/modified files), otherwise old_path (for deleted files)
-                    String filePath = diff.getNewPath();
-                    if (filePath == null || filePath.equals("/dev/null")) {
-                        filePath = diff.getOldPath();
-                    }
-                    return filePath;
-                })
-                .filter(path -> path != null && !path.equals("/dev/null"))
-                .collect(Collectors.toSet());
+        // Create a set to store all changed files
+        var changedFiles = new HashSet<String>();
+
+        // Process each diff to handle new, modified, renamed, and deleted files
+        for (var diff : diffs) {
+            var oldPath = diff.getOldPath();
+            var newPath = diff.getNewPath();
+
+            // Handle renamed files by including both old and new paths
+            if (diff.getRenamedFile() != null && diff.getRenamedFile()) {
+                if (oldPath != null && !oldPath.equals("/dev/null")) {
+                    changedFiles.add(oldPath);
+                }
+                if (newPath != null && !newPath.equals("/dev/null")) {
+                    changedFiles.add(newPath);
+                }
+            } 
+            // Handle deleted files
+            else if (newPath == null || newPath.equals("/dev/null")) {
+                if (oldPath != null && !oldPath.equals("/dev/null")) {
+                    changedFiles.add(oldPath);
+                }
+            } 
+            // Handle new or modified files
+            else {
+                changedFiles.add(newPath);
+            }
+        }
+
+        return changedFiles;
     }
 
-    @Override
-    public MergeRequestInfo convertToMergeRequestInfo(MergeRequest mergeRequest, Set<String> changedFiles) {
+    protected MergeRequestInfo convertToMergeRequestInfo(MergeRequest mergeRequest, Set<String> changedFiles) {
         return MergeRequestInfo.builder()
-                .id(mergeRequest.getIid().intValue())
+                .id(mergeRequest.getIid())
                 .title(mergeRequest.getTitle())
                 .sourceBranch(mergeRequest.getSourceBranch())
                 .targetBranch(mergeRequest.getTargetBranch())
                 .changedFiles(changedFiles)
+                .labels(new HashSet<>(mergeRequest.getLabels()))
                 .build();
     }
 

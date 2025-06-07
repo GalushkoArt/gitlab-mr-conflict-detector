@@ -27,5 +27,5 @@ public interface ConflictDetector {
      * @param conflicts list of detected conflicts
      * @return set of MR IDs that have conflicts
      */
-    Set<Integer> getConflictingMergeRequestIds(List<MergeRequestConflict> conflicts);
+    Set<Long> getConflictingMergeRequestIds(List<MergeRequestConflict> conflicts);
 }

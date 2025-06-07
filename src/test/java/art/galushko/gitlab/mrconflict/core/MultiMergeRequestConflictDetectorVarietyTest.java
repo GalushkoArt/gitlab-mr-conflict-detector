@@ -1,7 +1,6 @@
 package art.galushko.gitlab.mrconflict.core;
 
 import art.galushko.gitlab.mrconflict.config.IgnorePatternMatcher;
-import art.galushko.gitlab.mrconflict.model.ConflictReason;
 import art.galushko.gitlab.mrconflict.model.MergeRequestConflict;
 import art.galushko.gitlab.mrconflict.model.MergeRequestInfo;
 import org.junit.jupiter.api.DisplayName;
@@ -39,7 +38,7 @@ class MultiMergeRequestConflictDetectorVarietyTest {
         // Then
         if (shouldHaveConflict) {
             assertThat(conflicts).hasSize(1);
-            MergeRequestConflict conflict = conflicts.get(0);
+            MergeRequestConflict conflict = conflicts.getFirst();
             assertThat(conflict.firstMr()).isEqualTo(mr1);
             assertThat(conflict.secondMr()).isEqualTo(mr2);
         } else {
@@ -108,11 +107,11 @@ class MultiMergeRequestConflictDetectorVarietyTest {
         assertThat(conflicts).hasSize(3);
 
         // Verify conflicting MR IDs
-        Set<Integer> conflictingIds = detector.getConflictingMergeRequestIds(conflicts);
-        assertThat(conflictingIds.contains(1)).isTrue();
-        assertThat(conflictingIds.contains(2)).isTrue();
-        assertThat(conflictingIds.contains(4)).isTrue();
-        assertThat(conflictingIds.contains(3)).isFalse();
+        Set<Long> conflictingIds = detector.getConflictingMergeRequestIds(conflicts);
+        assertThat(conflictingIds.contains(1L)).isTrue();
+        assertThat(conflictingIds.contains(2L)).isTrue();
+        assertThat(conflictingIds.contains(4L)).isTrue();
+        assertThat(conflictingIds.contains(3L)).isFalse();
     }
 
     @ParameterizedTest

@@ -12,17 +12,8 @@ import java.util.Set;
  * Represents a merge request with its metadata for conflict detection.
  */
 @Builder
-public record MergeRequestInfo(int id, String title, String sourceBranch, String targetBranch,
-                               Set<String> changedFiles) {
-
-    /**
-     * Custom constructor to convert List to Set for better performance
-     */
-    public MergeRequestInfo(int id, String title, String sourceBranch, String targetBranch,
-                           List<String> changedFiles) {
-        this(id, title, sourceBranch, targetBranch, 
-             changedFiles != null ? new HashSet<>(changedFiles) : new HashSet<>());
-    }
+public record MergeRequestInfo(long id, String title, String sourceBranch, String targetBranch,
+                               Set<String> changedFiles, Set<String> labels) {
 
     /**
      * Gets the common files between this MR and another MR.

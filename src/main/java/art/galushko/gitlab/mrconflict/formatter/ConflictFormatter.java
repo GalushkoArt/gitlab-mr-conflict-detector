@@ -1,6 +1,7 @@
 package art.galushko.gitlab.mrconflict.formatter;
 
 import art.galushko.gitlab.mrconflict.model.MergeRequestConflict;
+import org.gitlab4j.api.models.MergeRequest;
 
 import java.util.List;
 
@@ -28,9 +29,10 @@ public interface ConflictFormatter {
     /**
      * Formats a note with conflict information for a specific merge request.
      *
-     * @param conflicts list of conflicts
-     * @param mergeRequestIid merge request IID
+     * @param conflicts           list of conflicts
+     * @param mergeRequestIid     merge request IID
+     * @param resolvedConflictMrs
      * @return formatted note
      */
-    String formatConflictNote(List<MergeRequestConflict> conflicts, Long mergeRequestIid);
+    String formatConflictNote(List<MergeRequestConflict> conflicts, Long mergeRequestIid, List<MergeRequest> resolvedConflictMrs);
 }

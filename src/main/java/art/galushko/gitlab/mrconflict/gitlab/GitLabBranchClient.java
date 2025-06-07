@@ -16,36 +16,32 @@ public interface GitLabBranchClient {
      *
      * @param projectId GitLab project ID
      * @return list of branches
-     * @throws GitLabException if branches cannot be retrieved
      */
-    List<Branch> getBranches(Long projectId) throws GitLabException;
+    List<Branch> getBranches(Long projectId);
     
     /**
      * Gets protected branches for a project.
      *
      * @param projectId GitLab project ID
      * @return list of protected branch names
-     * @throws GitLabException if protected branches cannot be retrieved
      */
-    List<String> getProtectedBranches(Long projectId) throws GitLabException;
+    List<String> getProtectedBranches(Long projectId);
     
     /**
-     * Gets a specific branch information.
+     * Gets specific branch information.
      *
      * @param projectId GitLab project ID
      * @param branchName name of the branch
      * @return branch information if found
-     * @throws GitLabException if branch cannot be retrieved
      */
-    Optional<Branch> getBranch(Long projectId, String branchName) throws GitLabException;
+    Optional<Branch> getBranch(Long projectId, String branchName);
     
     /**
      * Checks if a branch is protected.
      *
      * @param projectId GitLab project ID
      * @param branchName name of the branch to check
-     * @return true if branch is protected
-     * @throws GitLabException if protection status cannot be determined
+     * @return true if the branch is protected
      */
-    boolean isBranchProtected(Long projectId, String branchName) throws GitLabException;
+    boolean isBranchProtected(Long projectId, String branchName);
 }

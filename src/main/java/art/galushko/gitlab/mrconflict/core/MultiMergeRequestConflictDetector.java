@@ -3,9 +3,9 @@ package art.galushko.gitlab.mrconflict.core;
 import art.galushko.gitlab.mrconflict.config.PatternMatcher;
 import art.galushko.gitlab.mrconflict.core.strategy.ConflictDetectionStrategy;
 import art.galushko.gitlab.mrconflict.core.strategy.DefaultConflictDetectionStrategy;
-import art.galushko.gitlab.mrconflict.model.*;
+import art.galushko.gitlab.mrconflict.model.MergeRequestConflict;
+import art.galushko.gitlab.mrconflict.model.MergeRequestInfo;
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.*;
@@ -82,8 +82,8 @@ public class MultiMergeRequestConflictDetector implements ConflictDetector {
         // Check all pairs of merge requests with all strategies
         for (int i = 0; i < mergeRequests.size(); i++) {
             for (int j = i + 1; j < mergeRequests.size(); j++) {
-                MergeRequestInfo mr1 = mergeRequests.get(i);
-                MergeRequestInfo mr2 = mergeRequests.get(j);
+                var mr1 = mergeRequests.get(i);
+                var mr2 = mergeRequests.get(j);
 
                 for (ConflictDetectionStrategy strategy : strategies) {
                     log.debug("Using strategy '{}' to detect conflicts between MR{} and MR{}", 
@@ -109,7 +109,7 @@ public class MultiMergeRequestConflictDetector implements ConflictDetector {
      * @return set of MR IDs that have conflicts
      */
     @Override
-    public Set<Integer> getConflictingMergeRequestIds(List<MergeRequestConflict> conflicts) {
+    public Set<Long> getConflictingMergeRequestIds(List<MergeRequestConflict> conflicts) {
         return conflicts.stream()
                 .flatMap(conflict -> Stream.of(conflict.firstMr().id(), conflict.secondMr().id()))
                 .collect(Collectors.toSet());

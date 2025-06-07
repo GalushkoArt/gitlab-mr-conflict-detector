@@ -10,7 +10,6 @@ import lombok.extern.slf4j.Slf4j;
 import picocli.CommandLine;
 
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.Callable;
 
 /**
@@ -146,16 +145,18 @@ public class SimpleGitLabMultiMergeRequestCommand implements Callable<Integer> {
             System.out.println(output);
 
             // Log conflicting MR IDs
-            Set<Integer> conflictingMrIds = conflictAnalysisService.getConflictingMergeRequestIds(conflicts);
+            var conflictingMrIds = conflictAnalysisService.getConflictingMergeRequestIds(conflicts);
             if (!conflictingMrIds.isEmpty()) {
                 log.info("Merge requests with conflicts: {}", conflictingMrIds);
                 log.info("These MRs should be marked with 'conflict' label");
-
-                // Optionally update GitLab with conflict information
-                if (createGitlabNote || updateMrStatus) {
-                    conflictAnalysisService.updateGitLabWithConflicts(
-                            projectId, conflictingMrIds, conflicts, createGitlabNote, updateMrStatus, dryRun);
-                }
+            } else {
+                log.info("No conflicts found at this moment");
+            }
+            // Optionally update GitLab with conflict information
+            if (createGitlabNote || updateMrStatus) {
+                conflictAnalysisService.updateGitLabWithConflicts(
+                        projectId, conflicts, createGitlabNote, updateMrStatus, dryRun
+                );
             }
 
             // Determine exit code
