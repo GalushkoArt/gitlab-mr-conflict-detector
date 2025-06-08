@@ -1,4 +1,4 @@
-package art.galushko.gitlab.mrconflict.config;
+package art.galushko.gitlab.mrconflict.core;
 
 /**
  * Interface for pattern matching functionality.

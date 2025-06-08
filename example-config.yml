@@ -1,0 +1,17 @@
+# GitLab MR Conflict Detector Configuration
+
+# GitLab connection settings
+gitlabUrl: https://gitlab.example.com
+projectId: 12345
+
+# Behavior settings
+createGitlabNote: true
+updateMrStatus: true
+dryRun: false
+verbose: true
+includeDraftMrs: false
+
+# Conflict detection settings
+ignorePatterns:
+  - "**/ignored.txt"
+  - "ignored_dir/*"

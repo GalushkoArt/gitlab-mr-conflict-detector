@@ -1,5 +1,6 @@
 package art.galushko.gitlab.mrconflict.core;
 
+import art.galushko.gitlab.mrconflict.config.AppConfig;
 import art.galushko.gitlab.mrconflict.di.ServiceFactory;
 import art.galushko.gitlab.mrconflict.formatter.ConflictFormatter;
 import art.galushko.gitlab.mrconflict.gitlab.GitLabClient;
@@ -33,6 +34,9 @@ class ConflictAnalysisServiceTest {
     private ServiceFactory serviceFactory;
 
     @Mock
+    private AppConfig config;
+
+    @Mock
     private GitLabClient gitLabClient;
 
     @Mock
@@ -55,6 +59,7 @@ class ConflictAnalysisServiceTest {
             when(serviceFactory.getMergeRequestService()).thenReturn(mergeRequestService);
             when(serviceFactory.getConflictDetector()).thenReturn(conflictDetector);
             when(serviceFactory.getConflictFormatter()).thenReturn(conflictFormatter);
+            when(serviceFactory.getConfig()).thenReturn(config);
 
             service = new ConflictAnalysisService();
         }
@@ -66,9 +71,11 @@ class ConflictAnalysisServiceTest {
         // Given
         String gitlabUrl = "https://gitlab.com";
         String gitlabToken = "to-ken_1234567890_-ABCDE";
+        when(config.getGitlabUrl()).thenReturn(gitlabUrl);
+        when(config.getGitlabToken()).thenReturn(gitlabToken);
 
         // When
-        service.authenticate(gitlabUrl, gitlabToken);
+        service.authenticate();
 
         // Then
         verify(gitLabClient).authenticate(gitlabUrl, gitlabToken);
@@ -80,9 +87,10 @@ class ConflictAnalysisServiceTest {
         // Given
         Long projectId = 123L;
         when(gitLabClient.hasProjectAccess(projectId)).thenReturn(true);
+        when(config.getProjectId()).thenReturn(projectId);
 
         // When
-        boolean result = service.hasProjectAccess(projectId);
+        boolean result = service.hasAccessToProjectFromConfig();
 
         // Then
         assertThat(result).isTrue();
@@ -98,9 +106,11 @@ class ConflictAnalysisServiceTest {
         MergeRequestInfo mr = MergeRequestInfo.builder().id(456).build();
 
         when(mergeRequestService.getMergeRequest(projectId, mrIid)).thenReturn(mr);
+        when(config.getMergeRequestIids()).thenReturn(List.of(mrIid));
+        when(config.getProjectId()).thenReturn(projectId);
 
         // When
-        List<MergeRequestInfo> result = service.fetchMergeRequests(projectId, mrIid, true);
+        List<MergeRequestInfo> result = service.fetchMergeRequests();
 
         // Then
         assertThat(result).hasSize(1);
@@ -120,9 +130,12 @@ class ConflictAnalysisServiceTest {
         );
 
         when(mergeRequestService.getMergeRequestsForConflictAnalysis(projectId, true)).thenReturn(mrs);
+        when(config.getProjectId()).thenReturn(projectId);
+        when(config.getMergeRequestIids()).thenReturn(null);
+        when(config.getIncludeDraftMrs()).thenReturn(true);
 
         // When
-        List<MergeRequestInfo> result = service.fetchMergeRequests(projectId, null, true);
+        List<MergeRequestInfo> result = service.fetchMergeRequests();
 
         // Then
         assertThat(result).hasSize(2);
@@ -244,7 +257,6 @@ class ConflictAnalysisServiceTest {
     void shouldNotUpdateGitLabInDryRunMode() throws GitLabException {
         // Given
         Long projectId = 123L;
-        Set<Integer> conflictingMrIds = Set.of(1, 2);
         List<MergeRequestConflict> conflicts = List.of();
 
         // When
@@ -260,7 +272,6 @@ class ConflictAnalysisServiceTest {
     void shouldHandleGitLabExceptionDuringUpdate() throws GitLabException {
         // Given
         Long projectId = 123L;
-        Set<Integer> conflictingMrIds = Set.of(1);
         List<MergeRequestConflict> conflicts = List.of();
 
         // When & Then - should not throw exception

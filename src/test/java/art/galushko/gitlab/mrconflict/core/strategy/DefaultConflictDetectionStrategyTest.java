@@ -1,8 +1,7 @@
 package art.galushko.gitlab.mrconflict.core.strategy;
 
-import art.galushko.gitlab.mrconflict.config.PatternMatcher;
+import art.galushko.gitlab.mrconflict.core.PatternMatcher;
 import art.galushko.gitlab.mrconflict.model.ConflictReason;
-import art.galushko.gitlab.mrconflict.model.MergeRequestConflict;
 import art.galushko.gitlab.mrconflict.model.MergeRequestInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -12,7 +11,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;

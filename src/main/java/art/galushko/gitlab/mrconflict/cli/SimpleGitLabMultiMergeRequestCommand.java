@@ -1,14 +1,15 @@
 package art.galushko.gitlab.mrconflict.cli;
 
+import art.galushko.gitlab.mrconflict.config.AppConfig;
+import art.galushko.gitlab.mrconflict.config.ConfigurationService;
 import art.galushko.gitlab.mrconflict.core.ConflictAnalysisService;
+import art.galushko.gitlab.mrconflict.di.ServiceFactory;
 import art.galushko.gitlab.mrconflict.gitlab.GitLabException;
 import art.galushko.gitlab.mrconflict.model.MergeRequestConflict;
-import art.galushko.gitlab.mrconflict.model.MergeRequestInfo;
-import art.galushko.gitlab.mrconflict.security.CredentialService;
-import art.galushko.gitlab.mrconflict.security.InputValidator;
 import lombok.extern.slf4j.Slf4j;
 import picocli.CommandLine;
 
+import java.io.File;
 import java.util.List;
 import java.util.concurrent.Callable;
 
@@ -24,37 +25,32 @@ import java.util.concurrent.Callable;
 )
 public class SimpleGitLabMultiMergeRequestCommand implements Callable<Integer> {
 
-    private final ConflictAnalysisService conflictAnalysisService;
-    private final CredentialService credentialService;
-    private final InputValidator inputValidator;
+    private final ConfigurationService configurationService;
 
     @CommandLine.Option(
             names = {"--gitlab-url"},
-            description = "GitLab instance URL (can also be set via GITLAB_URL environment variable)",
-            required = false
+            description = "GitLab instance URL (can also be set via GITLAB_URL environment variable)"
     )
     private String gitlabUrl;
 
     @CommandLine.Option(
             names = {"--gitlab-token"},
-            description = "GitLab personal access token (can also be set via GITLAB_TOKEN environment variable)",
-            required = false
+            description = "GitLab personal access token (can also be set via GITLAB_TOKEN environment variable)"
     )
     private String gitlabToken;
 
     @CommandLine.Option(
             names = {"--project-id"},
-            description = "GitLab project ID",
-            required = true
+            description = "GitLab project ID"
     )
     private Long projectId;
 
     @CommandLine.Option(
-            names = {"--mr-iid"},
-            description = "Specific merge request IID to analyze (optional)",
-            required = false
+            names = {"--mr-iids"},
+            description = "Specific merge requests IID to analyze (optional)",
+            split = ","
     )
-    private Long mergeRequestIid;
+    private List<Long> mergeRequestIids;
 
     @CommandLine.Option(
             names = {"--create-gitlab-note"},
@@ -98,14 +94,18 @@ public class SimpleGitLabMultiMergeRequestCommand implements Callable<Integer> {
     )
     private List<String> ignorePatterns;
 
+    @CommandLine.Option(
+            names = {"--config-file"},
+            description = "Path to YAML configuration file"
+    )
+    private File configFile;
+
     private static final int EXIT_SUCCESS = 0;
     private static final int EXIT_CONFLICTS_DETECTED = 1;
     private static final int EXIT_ERROR = 2;
 
     public SimpleGitLabMultiMergeRequestCommand() {
-        this.conflictAnalysisService = new ConflictAnalysisService();
-        this.credentialService = new CredentialService();
-        this.inputValidator = new InputValidator();
+        this.configurationService = new ConfigurationService();
     }
 
     /**
@@ -123,23 +123,43 @@ public class SimpleGitLabMultiMergeRequestCommand implements Callable<Integer> {
 
             log.info("Starting GitLab Multi-MR Conflict Detection");
 
-            // Validate inputs
-            validateInputs();
+            // Create CLI config from command-line arguments
+            var cliConfig = AppConfig.builder()
+                    .gitlabUrl(gitlabUrl)
+                    .gitlabToken(gitlabToken)
+                    .projectId(projectId)
+                    .mergeRequestIids(mergeRequestIids)
+                    .createGitlabNote(createGitlabNote)
+                    .updateMrStatus(updateMrStatus)
+                    .dryRun(dryRun)
+                    .verbose(verbose)
+                    .includeDraftMrs(includeDraftMrs)
+                    .ignorePatterns(ignorePatterns)
+                    .build();
+
+            // Create unified configuration
+            AppConfig config = configurationService.createUnifiedConfig(cliConfig, configFile);
+
+            // Validate configuration
+            configurationService.validateConfig(config);
+            ServiceFactory.provideConfig(config);
+            var conflictAnalysisService = new ConflictAnalysisService();
 
             // Authenticate with GitLab
-            conflictAnalysisService.authenticate(gitlabUrl, gitlabToken);
+            conflictAnalysisService.authenticate();
 
             // Validate GitLab connection
-            if (!conflictAnalysisService.hasProjectAccess(projectId)) {
-                throw new GitLabException("No access to project " + projectId +
+            if (!conflictAnalysisService.hasAccessToProjectFromConfig()) {
+                throw new GitLabException("No access to project " + config.getProjectId() +
                         ". Check your GitLab token permissions.");
             }
 
-            log.info("Analyzing merge requests for project ID: {}", projectId);
+            log.info("Analyzing merge requests for project ID: {}", config.getProjectId());
 
             log.debug("Fetching merge requests from GitLab...");
             // Fetch merge requests from GitLab
-            List<MergeRequestInfo> mergeRequests = conflictAnalysisService.fetchMergeRequests(projectId, mergeRequestIid, includeDraftMrs);
+            var mergeRequests = conflictAnalysisService.fetchMergeRequests(
+            );
 
             if (mergeRequests.isEmpty()) {
                 log.info("No merge requests found for analysis");
@@ -148,12 +168,10 @@ public class SimpleGitLabMultiMergeRequestCommand implements Callable<Integer> {
 
             log.info("Found {} merge requests for analysis", mergeRequests.size());
 
-            // Get to ignore patterns (empty for now, can be extended)
-            List<String> ignorePatterns = List.of("**/ignored.txt", "ignored_dir/*");
-
             // Perform conflict detection
             log.info("Analyzing merge requests for conflicts...");
-            List<MergeRequestConflict> conflicts = conflictAnalysisService.detectConflicts(mergeRequests, ignorePatterns);
+            List<MergeRequestConflict> conflicts = conflictAnalysisService.detectConflicts(
+                    mergeRequests, config.getIgnorePatterns());
 
             // Generate and display output
             String output = conflictAnalysisService.formatConflicts(conflicts);
@@ -167,10 +185,14 @@ public class SimpleGitLabMultiMergeRequestCommand implements Callable<Integer> {
             } else {
                 log.info("No conflicts found at this moment");
             }
+
             // Optionally update GitLab with conflict information
-            if (createGitlabNote || updateMrStatus) {
+            if (config.getCreateGitlabNote() || config.getUpdateMrStatus()) {
+                log.info("Updating GitLab with conflict information");
+
                 conflictAnalysisService.updateGitLabWithConflicts(
-                        projectId, conflicts, createGitlabNote, updateMrStatus, dryRun
+                        config.getProjectId(), conflicts, config.getCreateGitlabNote(),
+                        config.getUpdateMrStatus(), config.getDryRun()
                 );
             }
 
@@ -199,58 +221,6 @@ public class SimpleGitLabMultiMergeRequestCommand implements Callable<Integer> {
             rootLogger.setLevel(ch.qos.logback.classic.Level.DEBUG);
         } else {
             rootLogger.setLevel(ch.qos.logback.classic.Level.INFO);
-        }
-    }
-
-    /**
-     * Validates command-line inputs before processing.
-     * 
-     * @throws GitLabException if any input is invalid
-     */
-    private void validateInputs() throws GitLabException {
-        // Get credentials from environment variables if available
-        String token = credentialService.getGitLabToken(gitlabToken);
-        String url = credentialService.getGitLabUrl(gitlabUrl);
-
-        // Check if we have a token (either from CLI or environment)
-        if (token == null || token.trim().isEmpty()) {
-            throw new GitLabException("GitLab token is required. Provide it with --gitlab-token or set GITLAB_TOKEN environment variable.");
-        }
-
-        // Validate token format
-        if (!credentialService.isValidToken(token)) {
-            throw new GitLabException("Invalid GitLab token format");
-        }
-
-        // Check if we have a URL (either from CLI or environment)
-        if (url == null || url.trim().isEmpty()) {
-            throw new GitLabException("GitLab URL is required. Provide it with --gitlab-url or set GITLAB_URL environment variable.");
-        }
-
-        // Validate URL format
-        if (!inputValidator.isValidGitLabUrl(url)) {
-            throw new GitLabException("Invalid GitLab URL format: " + url);
-        }
-
-        // Validate project ID
-        if (projectId == null || projectId <= 0) {
-            throw new GitLabException("Invalid project ID: " + projectId);
-        }
-
-        // Validate project ID format
-        if (!inputValidator.isValidProjectId(projectId.toString())) {
-            throw new GitLabException("Invalid project ID format: " + projectId);
-        }
-
-        // Validate merge request IID if provided
-        if (mergeRequestIid != null) {
-            if (mergeRequestIid <= 0) {
-                throw new GitLabException("Invalid merge request IID: " + mergeRequestIid);
-            }
-
-            if (!inputValidator.isValidMergeRequestIid(mergeRequestIid.toString())) {
-                throw new GitLabException("Invalid merge request IID format: " + mergeRequestIid);
-            }
         }
     }
 

@@ -1,9 +1,10 @@
 package art.galushko.gitlab.mrconflict.di;
 
-import art.galushko.gitlab.mrconflict.config.IgnorePatternMatcher;
-import art.galushko.gitlab.mrconflict.config.PatternMatcher;
+import art.galushko.gitlab.mrconflict.config.AppConfig;
 import art.galushko.gitlab.mrconflict.core.ConflictDetector;
+import art.galushko.gitlab.mrconflict.core.IgnorePatternMatcher;
 import art.galushko.gitlab.mrconflict.core.MultiMergeRequestConflictDetector;
+import art.galushko.gitlab.mrconflict.core.PatternMatcher;
 import art.galushko.gitlab.mrconflict.formatter.ConflictFormatter;
 import art.galushko.gitlab.mrconflict.formatter.DefaultConflictFormatter;
 import art.galushko.gitlab.mrconflict.gitlab.GitLab4JClient;
@@ -27,21 +28,35 @@ public class ServiceFactory {
     private MergeRequestService mergeRequestService;
     private ConflictDetector conflictDetector;
     private ConflictFormatter conflictFormatter;
+    private AppConfig config;
 
-    private ServiceFactory() {
+    private ServiceFactory(AppConfig config) {
         // Private constructor to enforce singleton pattern
+        this.config = config;
     }
 
     /**
      * Gets the singleton instance of the ServiceFactory.
      *
      * @return the ServiceFactory instance
+     * @throws IllegalStateException when AppConfig is not provided via {@link ServiceFactory#provideConfig(AppConfig)}
      */
     public static synchronized ServiceFactory getInstance() {
         if (instance == null) {
-            instance = new ServiceFactory();
+            throw new IllegalStateException("ServiceFactory instance has not been provided");
         }
         return instance;
+    }
+
+    /**
+     * Provides the application configuration to initialize the ServiceFactory instance.
+     * This method must be called before attempting to retrieve the ServiceFactory instance.
+     *
+     * @param config the application configuration to be used by the ServiceFactory
+     * @throws IllegalArgumentException if the provided configuration is null
+     */
+    public static synchronized void provideConfig(AppConfig config) {
+        instance = new ServiceFactory(config);
     }
 
     /**
@@ -112,5 +127,12 @@ public class ServiceFactory {
             conflictFormatter = new DefaultConflictFormatter();
         }
         return conflictFormatter;
+    }
+
+    public synchronized AppConfig getConfig() {
+        if (config == null) {
+            throw new IllegalStateException("AppConfig has not been provided");
+        }
+        return config;
     }
 }

@@ -1,6 +1,5 @@
 package art.galushko.gitlab.mrconflict.core;
 
-import art.galushko.gitlab.mrconflict.config.IgnorePatternMatcher;
 import art.galushko.gitlab.mrconflict.model.MergeRequestConflict;
 import art.galushko.gitlab.mrconflict.model.MergeRequestInfo;
 import org.junit.jupiter.api.DisplayName;

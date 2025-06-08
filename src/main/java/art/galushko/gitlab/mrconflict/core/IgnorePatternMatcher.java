@@ -1,4 +1,4 @@
-package art.galushko.gitlab.mrconflict.config;
+package art.galushko.gitlab.mrconflict.core;
 
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
@@ -59,7 +59,7 @@ public class IgnorePatternMatcher implements PatternMatcher {
      * Constructs a new IgnorePatternMatcher with default case-sensitive matching and extended glob enabled.
      */
     public IgnorePatternMatcher() {
-        this(true, true);
+        this(false, true);
     }
 
     /**
@@ -113,7 +113,7 @@ public class IgnorePatternMatcher implements PatternMatcher {
         }
 
         // Apply negation if needed
-        return negated ? !matches : matches;
+        return negated != matches;
     }
 
     /**

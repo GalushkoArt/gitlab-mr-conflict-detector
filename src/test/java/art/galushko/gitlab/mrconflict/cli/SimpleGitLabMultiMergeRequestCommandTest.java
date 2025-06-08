@@ -152,7 +152,7 @@ class SimpleGitLabMultiMergeRequestCommandTest {
                 "--gitlab-url", "https://gitlab.com",
                 "--gitlab-token", "glpat-valid-token-format",
                 "--project-id", "123",
-                "--mr-iid", "-1"
+                "--mr-iids", "-1"
         );
 
         // Then

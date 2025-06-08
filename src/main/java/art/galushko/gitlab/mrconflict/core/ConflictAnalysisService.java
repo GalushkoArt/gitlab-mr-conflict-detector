@@ -1,5 +1,6 @@
 package art.galushko.gitlab.mrconflict.core;
 
+import art.galushko.gitlab.mrconflict.config.AppConfig;
 import art.galushko.gitlab.mrconflict.di.ServiceFactory;
 import art.galushko.gitlab.mrconflict.formatter.ConflictFormatter;
 import art.galushko.gitlab.mrconflict.gitlab.GitLabClient;
@@ -8,7 +9,6 @@ import art.galushko.gitlab.mrconflict.gitlab.MergeRequestService;
 import art.galushko.gitlab.mrconflict.model.MergeRequestConflict;
 import art.galushko.gitlab.mrconflict.model.MergeRequestInfo;
 import art.galushko.gitlab.mrconflict.security.CredentialService;
-import art.galushko.gitlab.mrconflict.security.InputValidator;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.LinkedHashSet;
@@ -29,7 +29,7 @@ public class ConflictAnalysisService {
     private final ConflictDetector conflictDetector;
     private final ConflictFormatter conflictFormatter;
     private final CredentialService credentialService;
-    private final InputValidator inputValidator;
+    private final AppConfig config;
     private static final String CONFLICTS_LABEL = "conflicts";
     private static final String CONFLICT_LABEL_PREFIX = "conflict:MR";
 
@@ -38,31 +38,22 @@ public class ConflictAnalysisService {
      */
     public ConflictAnalysisService() {
         var serviceFactory = ServiceFactory.getInstance();
+        this.config = serviceFactory.getConfig();
         this.gitLabClient = serviceFactory.getGitLabClient();
         this.mergeRequestService = serviceFactory.getMergeRequestService();
         this.conflictDetector = serviceFactory.getConflictDetector();
         this.conflictFormatter = serviceFactory.getConflictFormatter();
         this.credentialService = new CredentialService();
-        this.inputValidator = new InputValidator();
     }
 
     /**
      * Authenticates with GitLab.
-     * Supports reading credentials from environment variables.
      *
-     * @param gitlabUrl   GitLab instance URL
-     * @param gitlabToken GitLab personal access token
      * @throws GitLabException if authentication fails
      */
-    public void authenticate(String gitlabUrl, String gitlabToken) throws GitLabException {
-        // Validate and potentially get credentials from environment variables
-        String token = credentialService.getGitLabToken(gitlabToken);
-        String url = credentialService.getGitLabUrl(gitlabUrl);
-
-        // Validate token format
-        if (!credentialService.isValidToken(token)) {
-            throw new GitLabException("Invalid GitLab token format");
-        }
+    public void authenticate() throws GitLabException {
+        var token = config.getGitlabToken();
+        var url = config.getGitlabUrl();
 
         // Log with masked token
         log.debug("Authenticating with GitLab at {} using token {}", url, credentialService.maskToken(token));
@@ -73,55 +64,34 @@ public class ConflictAnalysisService {
     /**
      * Checks if the user has access to the specified project.
      *
-     * @param projectId GitLab project ID
      * @return true if the user has access
      * @throws GitLabException if the check fails
      */
-    public boolean hasProjectAccess(Long projectId) throws GitLabException {
-        return gitLabClient.hasProjectAccess(projectId);
+    public boolean hasAccessToProjectFromConfig() throws GitLabException {
+        return gitLabClient.hasProjectAccess(config.getProjectId());
     }
 
     /**
      * Fetches merge requests for conflict analysis.
      *
-     * @param projectId               GitLab project ID
-     * @param specificMergeRequestIid specific merge request IID (optional)
-     * @param includeDraftMrs         whether to include draft/WIP merge requests
      * @return list of merge requests
      * @throws GitLabException if merge requests cannot be fetched
      */
-    public List<MergeRequestInfo> fetchMergeRequests(Long projectId, Long specificMergeRequestIid, boolean includeDraftMrs)
+    public List<MergeRequestInfo> fetchMergeRequests()
             throws GitLabException {
+        var projectId = config.getProjectId();
+        var specificMergeRequestIids = config.getMergeRequestIids();
 
-        // Validate project ID
-        if (projectId == null || projectId <= 0) {
-            throw new GitLabException("Invalid project ID: " + projectId);
-        }
-
-        // Validate project ID format
-        if (!inputValidator.isValidProjectId(projectId.toString())) {
-            throw new GitLabException("Invalid project ID format: " + projectId);
-        }
-
-        if (specificMergeRequestIid != null) {
-            // Validate merge request IID if provided
-            if (specificMergeRequestIid <= 0) {
-                throw new GitLabException("Invalid merge request IID: " + specificMergeRequestIid);
-            }
-
-            // Validate merge request IID format
-            if (!inputValidator.isValidMergeRequestIid(specificMergeRequestIid.toString())) {
-                throw new GitLabException("Invalid merge request IID format: " + specificMergeRequestIid);
-            }
-
+        if (specificMergeRequestIids != null && !specificMergeRequestIids.isEmpty()) {
             // Fetch specific merge request
-            log.info("Fetching specific merge request: {}", specificMergeRequestIid);
-            var mr = mergeRequestService.getMergeRequest(projectId, specificMergeRequestIid);
-            return List.of(mr);
+            log.info("Fetching specific merge requests: {}", specificMergeRequestIids);
+            return specificMergeRequestIids.stream()
+                    .map(iid -> mergeRequestService.getMergeRequest(projectId, iid))
+                    .toList();
         } else {
             // Fetch all open merge requests for conflict analysis
             log.info("Fetching all open merge requests for conflict analysis");
-            return mergeRequestService.getMergeRequestsForConflictAnalysis(projectId, includeDraftMrs);
+            return mergeRequestService.getMergeRequestsForConflictAnalysis(projectId, config.getIncludeDraftMrs());
         }
     }
 
@@ -136,6 +106,7 @@ public class ConflictAnalysisService {
                                                       List<String> ignorePatterns) {
         return conflictDetector.detectConflicts(mergeRequests, ignorePatterns);
     }
+
 
     /**
      * Formats conflicts into a human-readable string.
@@ -157,22 +128,26 @@ public class ConflictAnalysisService {
         return conflictDetector.getConflictingMergeRequestIds(conflicts);
     }
 
+
     /**
      * Updates GitLab with conflict information.
      *
-     * @param projectId    GitLab project ID
-     * @param conflicts    list of conflicts
-     * @param createNotes  whether to create notes on merge requests
-     * @param updateStatus whether to update the merge request status
-     * @param dryRun       whether to perform a dry run (no changes)
+     * @param projectId         GitLab project ID
+     * @param conflicts         list of conflicts
+     * @param createNotes       whether to create notes on merge requests
+     * @param updateStatus      whether to update the merge request status
+     * @param dryRun            whether to perform a dry run (no changes)
      */
     public void updateGitLabWithConflicts(Long projectId,
                                           List<MergeRequestConflict> conflicts,
                                           boolean createNotes, boolean updateStatus, boolean dryRun) {
-
         try {
-            for (var mergeRequest : mergeRequestService.getMergeRequests(projectId, "opened")) {
+            var mergeRequests = mergeRequestService.getMergeRequests(projectId, "opened");
+            log.info("Processing {} merge requests for conflict updates", mergeRequests.size());
+
+            for (var mergeRequest : mergeRequests) {
                 final long mrId = mergeRequest.id();
+                log.debug("Processing MR #{} ({})", mrId, mergeRequest.title());
 
                 // Find all conflicts involving this MR
                 final List<MergeRequestConflict> relevantConflicts = findConflictsForMr(conflicts, mrId);

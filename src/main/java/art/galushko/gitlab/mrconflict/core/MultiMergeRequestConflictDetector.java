@@ -1,6 +1,5 @@
 package art.galushko.gitlab.mrconflict.core;
 
-import art.galushko.gitlab.mrconflict.config.PatternMatcher;
 import art.galushko.gitlab.mrconflict.core.strategy.ConflictDetectionStrategy;
 import art.galushko.gitlab.mrconflict.core.strategy.DefaultConflictDetectionStrategy;
 import art.galushko.gitlab.mrconflict.model.MergeRequestConflict;
