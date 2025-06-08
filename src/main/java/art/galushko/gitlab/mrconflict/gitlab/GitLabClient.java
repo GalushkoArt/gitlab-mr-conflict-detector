@@ -5,6 +5,5 @@ package art.galushko.gitlab.mrconflict.gitlab;
  * This interface follows the Interface Segregation Principle by extending
  * smaller, focused interfaces for different GitLab API operations.
  */
-public interface GitLabClient extends GitLabAuthenticationClient, GitLabProjectClient, 
-                                      GitLabBranchClient, GitLabMergeRequestClient {
+public interface GitLabClient extends GitLabAuthenticationClient, GitLabProjectClient, GitLabMergeRequestClient {
 }

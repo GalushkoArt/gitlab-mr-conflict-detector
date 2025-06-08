@@ -190,7 +190,7 @@ class MultiMergeRequestConflictDetectorVarietyTest {
                 .title("MR" + id)
                 .sourceBranch(sourceBranch)
                 .targetBranch(targetBranch)
-                .changedFiles(new HashSet<>(Arrays.asList(changedFiles)))
+                .changedFiles(new LinkedHashSet<>(Arrays.asList(changedFiles)))
                 .build();
     }
 }

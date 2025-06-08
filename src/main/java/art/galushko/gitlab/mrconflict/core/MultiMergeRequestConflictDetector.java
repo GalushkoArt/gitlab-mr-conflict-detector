@@ -77,7 +77,7 @@ public class MultiMergeRequestConflictDetector implements ConflictDetector {
         log.info("Detecting conflicts between {} merge requests using {} strategies", 
                 mergeRequests.size(), strategies.size());
 
-        Set<MergeRequestConflict> conflicts = new HashSet<>();
+        Set<MergeRequestConflict> conflicts = new LinkedHashSet<>();
 
         // Check all pairs of merge requests with all strategies
         for (int i = 0; i < mergeRequests.size(); i++) {

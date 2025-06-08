@@ -54,6 +54,7 @@ dependencies {
     testImplementation("org.mockito:mockito-core:5.8.0")
     testImplementation("org.mockito:mockito-junit-jupiter:5.8.0")
     testImplementation("org.assertj:assertj-core:3.25.1")
+    testImplementation("com.github.tomakehurst:wiremock-jre8:2.35.1")
 }
 
 application {

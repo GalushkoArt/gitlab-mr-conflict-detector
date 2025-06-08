@@ -11,7 +11,7 @@ import art.galushko.gitlab.mrconflict.security.CredentialService;
 import art.galushko.gitlab.mrconflict.security.InputValidator;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -179,8 +179,8 @@ public class ConflictAnalysisService {
                 final Set<Long> conflictingMrIds = extractConflictingMrIds(relevantConflicts, mrId);
 
                 // Get current MR details and labels
-                final var labels = new HashSet<>(mergeRequest.labels());
-                final var originalLabels = new HashSet<>(labels);
+                final var labels = new LinkedHashSet<>(mergeRequest.labels());
+                final var originalLabels = new LinkedHashSet<>(labels);
 
                 // Update labels based on conflict status
                 if (relevantConflicts.isEmpty()) {

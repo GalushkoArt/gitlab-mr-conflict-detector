@@ -5,7 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.gitlab4j.api.models.MergeRequest;
 
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -72,7 +72,7 @@ public class GitLab4JMergeRequestService implements MergeRequestService {
         var diffs = gitLabClient.getMergeRequestChanges(projectId, mergeRequestIid);
 
         // Create a set to store all changed files
-        var changedFiles = new HashSet<String>();
+        var changedFiles = new LinkedHashSet<String>();
 
         // Process each diff to handle new, modified, renamed, and deleted files
         for (var diff : diffs) {
@@ -118,7 +118,7 @@ public class GitLab4JMergeRequestService implements MergeRequestService {
                 .sourceBranch(mergeRequest.getSourceBranch())
                 .targetBranch(mergeRequest.getTargetBranch())
                 .changedFiles(changedFiles)
-                .labels(new HashSet<>(mergeRequest.getLabels()))
+                .labels(new LinkedHashSet<>(mergeRequest.getLabels()))
                 .draft(isDraft)
                 .build();
     }

@@ -15,20 +15,16 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
-
-import static art.galushko.gitlab.mrconflict.utils.CollectionUtils.mapCollection;
-import static art.galushko.gitlab.mrconflict.utils.ThrowingFunction.wrap;
 
 /**
  * GitLab4J-based implementation of the GitLabClient interface.
  */
 @Slf4j
 public class GitLab4JClient implements GitLabClient {
-    GitLabApi gitLabApi; // Package-private for service access
+    private GitLabApi gitLabApi; // Package-private for service access
     private final CredentialService credentialService;
     private final InputValidator inputValidator;
 
@@ -37,9 +33,6 @@ public class GitLab4JClient implements GitLabClient {
 
     // Caffeine caches for frequently accessed data with automatic expiration
     private final Cache<Long, Project> projectByIdCache;
-    private final Cache<String, Project> projectByPathCache;
-    private final Cache<Long, List<Branch>> branchesCache;
-    private final Cache<Long, List<String>> protectedBranchesCache;
     private final Cache<String, List<MergeRequest>> mergeRequestsCache;
     private final Cache<String, MergeRequest> mergeRequestCache;
     private final Cache<String, List<Diff>> mergeRequestChangesCache;
@@ -48,24 +41,11 @@ public class GitLab4JClient implements GitLabClient {
     /**
      * Creates a new GitLab4JClient with security services.
      */
-    public GitLab4JClient() {
-        this.credentialService = new CredentialService();
-        this.inputValidator = new InputValidator();
-
+    public GitLab4JClient(CredentialService credentialService, InputValidator inputValidator) {
+        this.credentialService = credentialService;
+        this.inputValidator = inputValidator;
         // Initialize caches with Caffeine
         this.projectByIdCache = Caffeine.newBuilder()
-                .expireAfterWrite(DEFAULT_CACHE_TTL_SECONDS, TimeUnit.SECONDS)
-                .build();
-
-        this.projectByPathCache = Caffeine.newBuilder()
-                .expireAfterWrite(DEFAULT_CACHE_TTL_SECONDS, TimeUnit.SECONDS)
-                .build();
-
-        this.branchesCache = Caffeine.newBuilder()
-                .expireAfterWrite(DEFAULT_CACHE_TTL_SECONDS, TimeUnit.SECONDS)
-                .build();
-
-        this.protectedBranchesCache = Caffeine.newBuilder()
                 .expireAfterWrite(DEFAULT_CACHE_TTL_SECONDS, TimeUnit.SECONDS)
                 .build();
 
@@ -95,8 +75,8 @@ public class GitLab4JClient implements GitLabClient {
             }
 
             // Use token from environment variable if available
-            String token = credentialService.getGitLabToken(accessToken);
-            String url = credentialService.getGitLabUrl(gitlabUrl);
+            var token = credentialService.getGitLabToken(accessToken);
+            var url = credentialService.getGitLabUrl(gitlabUrl);
 
             // Validate GitLab URL
             if (!inputValidator.isValidGitLabUrl(url)) {
@@ -112,83 +92,24 @@ public class GitLab4JClient implements GitLabClient {
             return this;
         } catch (RuntimeException e) {
             // Sanitize error message to remove token if present
-            String sanitizedMessage = credentialService.sanitizeErrorMessage(e.getMessage(), accessToken);
+            var sanitizedMessage = credentialService.sanitizeErrorMessage(e.getMessage(), accessToken);
             throw new GitLabException("Failed to authenticate with GitLab: " + sanitizedMessage, e);
         }
     }
 
     private User getCurrentUser() {
-        try {
-            return currentUseCache.get("user", wrap(id -> gitLabApi.getUserApi().getCurrentUser()));
-        } catch (RuntimeException e) {
-            throw new GitLabException("Failed to get current user", e);
-        }
+        return currentUseCache.get("user", withRetry(
+                id -> gitLabApi.getUserApi().getCurrentUser(),
+                "Failed to get current user"
+        ));
     }
 
     @Override
     public Project getProject(Long projectId) {
-        try {
-            return projectByIdCache.get(projectId, wrap(gitLabApi.getProjectApi()::getProject));
-        } catch (RuntimeException e) {
-            throw new GitLabException("Failed to get project with ID: " + projectId, e);
-        }
-    }
-
-    @Override
-    public Project getProject(String projectPath) {
-        try {
-            return projectByPathCache.get(projectPath, wrap(gitLabApi.getProjectApi()::getProject));
-        } catch (RuntimeException e) {
-            throw new GitLabException("Failed to get project with path: " + projectPath, e);
-        }
-    }
-
-    @Override
-    public List<Branch> getBranches(Long projectId) {
-        try {
-            return branchesCache.get(projectId, wrap(gitLabApi.getRepositoryApi()::getBranches));
-        } catch (RuntimeException e) {
-            throw new GitLabException("Failed to get branches for project: " + projectId, e);
-        }
-    }
-
-    @Override
-    public List<String> getProtectedBranches(Long projectId) {
-        try {
-            return protectedBranchesCache.get(
-                    projectId,
-                    wrap(gitLabApi.getProtectedBranchesApi()::getProtectedBranches)
-                            .andThen(mapCollection(ProtectedBranch::getName))
-            );
-        } catch (RuntimeException e) {
-            throw new GitLabException("Failed to get protected branches for project: " + projectId, e);
-        }
-    }
-
-    @Override
-    public Optional<Branch> getBranch(Long projectId, String branchName) {
-        try {
-            // Validate inputs
-            if (branchName == null || branchName.trim().isEmpty()) {
-                throw new GitLabException("Branch name cannot be empty");
-            }
-
-            // Validate branch name format
-            if (!inputValidator.isValidBranchName(branchName)) {
-                throw new GitLabException("Invalid branch name format: " + branchName);
-            }
-
-            // Sanitize branch name for API call
-            var sanitizedBranchName = inputValidator.escapeForGitLabApi(branchName);
-
-            var branch = gitLabApi.getRepositoryApi().getBranch(projectId, sanitizedBranchName);
-            return Optional.ofNullable(branch);
-        } catch (GitLabApiException e) {
-            if (e.getHttpStatus() == 404) {
-                return Optional.empty();
-            }
-            throw new GitLabException("Failed to get branch '" + branchName + "' for project: " + projectId, e);
-        }
+        return projectByIdCache.get(projectId, withRetry(
+                gitLabApi.getProjectApi()::getProject,
+                "Failed to get project with ID: " + projectId
+        ));
     }
 
     @Override
@@ -204,7 +125,7 @@ public class GitLab4JClient implements GitLabClient {
                             List<MergeRequest> allMergeRequests = new ArrayList<>();
 
                             // Use Pager to handle pagination automatically
-                            var pager = gitLabApi.getMergeRequestApi().getMergeRequests(filter, 20);
+                            var pager = gitLabApi.getMergeRequestApi().getMergeRequests(filter, 96);
                             while (pager.hasNext()) {
                                 allMergeRequests.addAll(pager.next());
                                 log.debug("Fetched page of merge requests, total so far: {}", allMergeRequests.size());
@@ -220,18 +141,13 @@ public class GitLab4JClient implements GitLabClient {
 
     @Override
     public MergeRequest getMergeRequest(Long projectId, Long mergeRequestIid) {
-        try {
-            return mergeRequestCache.get(
-                    getMrCacheKey(projectId, mergeRequestIid),
-                    withRetry(
-                            id-> gitLabApi.getMergeRequestApi().getMergeRequest(projectId, mergeRequestIid),
-                            "Failed to get merge request " + mergeRequestIid + " for project: " + projectId
-                    )
-            );
-        } catch (RuntimeException e) {
-            throw new GitLabException("Failed to get merge request " + mergeRequestIid +
-                    " for project: " + projectId, e);
-        }
+        return mergeRequestCache.get(
+                getMrCacheKey(projectId, mergeRequestIid),
+                withRetry(
+                        id -> gitLabApi.getMergeRequestApi().getMergeRequest(projectId, mergeRequestIid),
+                        "Failed to get merge request " + mergeRequestIid + " for project: " + projectId
+                )
+        );
     }
 
     @Override
@@ -267,38 +183,16 @@ public class GitLab4JClient implements GitLabClient {
     }
 
     @Override
-    public String getDefaultBranch(Long projectId) {
-        try {
-            return getProject(projectId).getDefaultBranch();
-        } catch (Exception e) {
-            throw new GitLabException("Failed to get default branch for project: " + projectId, e);
-        }
-    }
-
-    @Override
-    public boolean isBranchProtected(Long projectId, String branchName) {
-        try {
-            return getProtectedBranches(projectId).contains(branchName);
-        } catch (Exception e) {
-            throw new GitLabException("Failed to check if branch is protected: " + branchName, e);
-        }
-    }
-
-    @Override
     public List<Diff> getMergeRequestChanges(Long projectId, Long mergeRequestIid) {
-        try {
-            return mergeRequestChangesCache.get(
-                    getMrCacheKey(projectId, mergeRequestIid),
-                    withRetry(
-                            id -> gitLabApi.getMergeRequestApi()
-                                    .getMergeRequestChanges(projectId, mergeRequestIid)
-                                    .getChanges(),
-                            "Failed to get changes for MR " + mergeRequestIid
-                    )
-            );
-        } catch (RuntimeException e) {
-            throw new GitLabException("Failed to get changes for MR " + mergeRequestIid, e);
-        }
+        return mergeRequestChangesCache.get(
+                getMrCacheKey(projectId, mergeRequestIid),
+                withRetry(
+                        id -> gitLabApi.getMergeRequestApi()
+                                .getMergeRequestChanges(projectId, mergeRequestIid)
+                                .getChanges(),
+                        "Failed to get changes for MR " + mergeRequestIid
+                )
+        );
     }
 
     @Override

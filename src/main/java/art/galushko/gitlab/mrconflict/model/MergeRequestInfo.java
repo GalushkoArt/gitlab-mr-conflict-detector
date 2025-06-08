@@ -3,7 +3,7 @@ package art.galushko.gitlab.mrconflict.model;
 import lombok.Builder;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -23,7 +23,7 @@ public record MergeRequestInfo(long id, String title, String sourceBranch, Strin
      */
     public List<String> getCommonFiles(MergeRequestInfo other) {
         // Create a new set to avoid modifying the original
-        Set<String> intersection = new HashSet<>(this.changedFiles);
+        Set<String> intersection = new LinkedHashSet<>(this.changedFiles);
         // Retain only elements that are in both sets (intersection)
         intersection.retainAll(other.changedFiles);
         // Convert back to list for compatibility with existing code

@@ -91,6 +91,13 @@ public class SimpleGitLabMultiMergeRequestCommand implements Callable<Integer> {
     )
     private boolean includeDraftMrs;
 
+    @CommandLine.Option(
+            names = {"--ignore-patterns"},
+            description = "Patterns for files/directories to ignore in conflict detection (comma-separated)",
+            split = ","
+    )
+    private List<String> ignorePatterns;
+
     private static final int EXIT_SUCCESS = 0;
     private static final int EXIT_CONFLICTS_DETECTED = 1;
     private static final int EXIT_ERROR = 2;
@@ -130,12 +137,12 @@ public class SimpleGitLabMultiMergeRequestCommand implements Callable<Integer> {
 
             log.info("Analyzing merge requests for project ID: {}", projectId);
 
+            log.debug("Fetching merge requests from GitLab...");
             // Fetch merge requests from GitLab
             List<MergeRequestInfo> mergeRequests = conflictAnalysisService.fetchMergeRequests(projectId, mergeRequestIid, includeDraftMrs);
 
             if (mergeRequests.isEmpty()) {
                 log.info("No merge requests found for analysis");
-                System.out.println("No merge requests found for conflict analysis.");
                 return EXIT_SUCCESS;
             }
 
@@ -145,11 +152,12 @@ public class SimpleGitLabMultiMergeRequestCommand implements Callable<Integer> {
             List<String> ignorePatterns = List.of("**/ignored.txt", "ignored_dir/*");
 
             // Perform conflict detection
+            log.info("Analyzing merge requests for conflicts...");
             List<MergeRequestConflict> conflicts = conflictAnalysisService.detectConflicts(mergeRequests, ignorePatterns);
 
             // Generate and display output
             String output = conflictAnalysisService.formatConflicts(conflicts);
-            System.out.println(output);
+            log.info(output);
 
             // Log conflicting MR IDs
             var conflictingMrIds = conflictAnalysisService.getConflictingMergeRequestIds(conflicts);
@@ -176,6 +184,13 @@ public class SimpleGitLabMultiMergeRequestCommand implements Callable<Integer> {
         }
     }
 
+    /**
+     * Configures the logging level based on the verbose flag.
+     * If verbose is true, sets the logging level to DEBUG.
+     * Otherwise, sets the logging level to INFO.
+     *
+     * @param verbose whether to enable verbose logging
+     */
     private void configureLogging(boolean verbose) {
         var rootLogger =
                 (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);

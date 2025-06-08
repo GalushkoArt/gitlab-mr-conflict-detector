@@ -10,6 +10,8 @@ import art.galushko.gitlab.mrconflict.gitlab.GitLab4JClient;
 import art.galushko.gitlab.mrconflict.gitlab.GitLab4JMergeRequestService;
 import art.galushko.gitlab.mrconflict.gitlab.GitLabClient;
 import art.galushko.gitlab.mrconflict.gitlab.MergeRequestService;
+import art.galushko.gitlab.mrconflict.security.CredentialService;
+import art.galushko.gitlab.mrconflict.security.InputValidator;
 
 /**
  * Factory for creating service instances.
@@ -71,7 +73,7 @@ public class ServiceFactory {
      */
     public synchronized GitLabClient getGitLabClient() {
         if (gitLabClient == null) {
-            gitLabClient = new GitLab4JClient();
+            gitLabClient = new GitLab4JClient(new CredentialService(), new InputValidator());
         }
         return gitLabClient;
     }

@@ -1,5 +1,6 @@
 package art.galushko.gitlab.mrconflict.gitlab;
 
+import art.galushko.gitlab.mrconflict.di.ServiceFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -13,42 +14,41 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * These tests require a GitLab instance to be available and configured via environment variables.
  * They will be skipped if the required environment variables are not set.
  */
+@EnabledIfEnvironmentVariable(named = "GITLAB_TEST_URL", matches = ".+")
+@EnabledIfEnvironmentVariable(named = "GITLAB_TEST_TOKEN", matches = ".+")
+@EnabledIfEnvironmentVariable(named = "GITLAB_TEST_PROJECT_ID", matches = ".+")
 class GitLabIntegrationTest {
 
     private static final String ENV_GITLAB_URL = "GITLAB_TEST_URL";
     private static final String ENV_GITLAB_TOKEN = "GITLAB_TEST_TOKEN";
     private static final String ENV_GITLAB_PROJECT_ID = "GITLAB_TEST_PROJECT_ID";
 
-    private String gitlabUrl;
-    private String gitlabToken;
     private Long projectId;
     private GitLabClient gitLabClient;
 
     @BeforeEach
     void setUp() throws GitLabException {
         // Get configuration from environment variables
-        gitlabUrl = System.getenv(ENV_GITLAB_URL);
-        gitlabToken = System.getenv(ENV_GITLAB_TOKEN);
+        String gitlabUrl = System.getenv(ENV_GITLAB_URL);
+        String gitlabToken = System.getenv(ENV_GITLAB_TOKEN);
         String projectIdStr = System.getenv(ENV_GITLAB_PROJECT_ID);
 
         // Skip tests if environment variables are not set
-        assumeTrue(gitlabUrl != null && !gitlabUrl.isEmpty(), 
+        assumeTrue(gitlabUrl != null && !gitlabUrl.isEmpty(),
                 "GitLab URL environment variable not set: " + ENV_GITLAB_URL);
-        assumeTrue(gitlabToken != null && !gitlabToken.isEmpty(), 
+        assumeTrue(gitlabToken != null && !gitlabToken.isEmpty(),
                 "GitLab token environment variable not set: " + ENV_GITLAB_TOKEN);
-        assumeTrue(projectIdStr != null && !projectIdStr.isEmpty(), 
+        assumeTrue(projectIdStr != null && !projectIdStr.isEmpty(),
                 "GitLab project ID environment variable not set: " + ENV_GITLAB_PROJECT_ID);
 
         projectId = Long.parseLong(projectIdStr);
 
         // Create and authenticate the GitLab client
-        gitLabClient = new GitLab4JClient().authenticate(gitlabUrl, gitlabToken);
+        gitLabClient = ServiceFactory.getInstance().getGitLabClient().authenticate(gitlabUrl, gitlabToken);
     }
 
     @Test
     @DisplayName("Should authenticate and access GitLab API")
-    @EnabledIfEnvironmentVariable(named = ENV_GITLAB_URL, matches = ".+")
-    @EnabledIfEnvironmentVariable(named = ENV_GITLAB_TOKEN, matches = ".+")
     void shouldAuthenticateAndAccessGitLabApi() throws GitLabException {
         // When
         boolean hasAccess = gitLabClient.hasProjectAccess(projectId);
@@ -59,9 +59,6 @@ class GitLabIntegrationTest {
 
     @Test
     @DisplayName("Should get project information")
-    @EnabledIfEnvironmentVariable(named = ENV_GITLAB_URL, matches = ".+")
-    @EnabledIfEnvironmentVariable(named = ENV_GITLAB_TOKEN, matches = ".+")
-    @EnabledIfEnvironmentVariable(named = ENV_GITLAB_PROJECT_ID, matches = ".+")
     void shouldGetProjectInformation() throws GitLabException {
         // When
         var project = gitLabClient.getProject(projectId);
@@ -72,38 +69,7 @@ class GitLabIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should get branches")
-    @EnabledIfEnvironmentVariable(named = ENV_GITLAB_URL, matches = ".+")
-    @EnabledIfEnvironmentVariable(named = ENV_GITLAB_TOKEN, matches = ".+")
-    @EnabledIfEnvironmentVariable(named = ENV_GITLAB_PROJECT_ID, matches = ".+")
-    void shouldGetBranches() throws GitLabException {
-        // When
-        var branches = gitLabClient.getBranches(projectId);
-
-        // Then
-        assertThat(branches).isNotNull();
-        assertThat(branches).isNotEmpty();
-    }
-
-    @Test
-    @DisplayName("Should get default branch")
-    @EnabledIfEnvironmentVariable(named = ENV_GITLAB_URL, matches = ".+")
-    @EnabledIfEnvironmentVariable(named = ENV_GITLAB_TOKEN, matches = ".+")
-    @EnabledIfEnvironmentVariable(named = ENV_GITLAB_PROJECT_ID, matches = ".+")
-    void shouldGetDefaultBranch() throws GitLabException {
-        // When
-        var defaultBranch = gitLabClient.getDefaultBranch(projectId);
-
-        // Then
-        assertThat(defaultBranch).isNotNull();
-        assertThat(defaultBranch).isNotEmpty();
-    }
-
-    @Test
     @DisplayName("Should get merge requests")
-    @EnabledIfEnvironmentVariable(named = ENV_GITLAB_URL, matches = ".+")
-    @EnabledIfEnvironmentVariable(named = ENV_GITLAB_TOKEN, matches = ".+")
-    @EnabledIfEnvironmentVariable(named = ENV_GITLAB_PROJECT_ID, matches = ".+")
     void shouldGetMergeRequests() throws GitLabException {
         // When
         var mergeRequests = gitLabClient.getMergeRequests(projectId, "opened");
@@ -111,5 +77,35 @@ class GitLabIntegrationTest {
         // Then
         assertThat(mergeRequests).isNotNull();
         // Note: The project might not have any open merge requests
+    }
+
+    @Test
+    @DisplayName("Should get merge request by iid")
+    void shouldGetMergeRequest() throws GitLabException {
+        // When
+        var mergeRequests = gitLabClient.getMergeRequests(projectId, "opened");
+
+        // Then
+        assertThat(mergeRequests).as("Please setup test repo. Some opened MR is expected").isNotEmpty();
+        // Note: The project might not have any open merge requests
+
+        var mergeRequest = mergeRequests.getFirst();
+        var mergeRequestInfo = gitLabClient.getMergeRequest(projectId, mergeRequest.getIid());
+        assertThat(mergeRequestInfo).isNotNull();
+    }
+
+    @Test
+    @DisplayName("Should get merge request changes by iid")
+    void shouldGetMergeRequestChanges() throws GitLabException {
+        // When
+        var mergeRequests = gitLabClient.getMergeRequests(projectId, "opened");
+
+        // Then
+        assertThat(mergeRequests).as("Please setup test repo. Some opened MR is expected").isNotEmpty();
+        // Note: The project might not have any open merge requests
+
+        var mergeRequest = mergeRequests.getFirst();
+        var mrChanges = gitLabClient.getMergeRequestChanges(projectId, mergeRequest.getIid());
+        assertThat(mrChanges).isNotEmpty();
     }
 }
