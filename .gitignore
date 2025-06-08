@@ -13,7 +13,6 @@ config.yml
 
 # Java
 *.class
-*.jar
 *.war
 *.ear
 *.nar
