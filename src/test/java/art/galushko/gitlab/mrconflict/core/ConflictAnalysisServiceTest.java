@@ -164,9 +164,10 @@ class ConflictAnalysisServiceTest {
         );
 
         when(conflictDetector.detectConflicts(mrs, ignorePatterns)).thenReturn(conflicts);
+        when(config.getIgnorePatterns()).thenReturn(ignorePatterns);
 
         // When
-        List<MergeRequestConflict> result = service.detectConflicts(mrs, ignorePatterns);
+        List<MergeRequestConflict> result = service.detectConflicts(mrs);
 
         // Then
         assertThat(result).isEqualTo(conflicts);
@@ -240,9 +241,13 @@ class ConflictAnalysisServiceTest {
                 MergeRequestInfo.builder().id(1L).labels(Set.of()).build(),
                 MergeRequestInfo.builder().id(2L).labels(Set.of()).build()
         ));
+        when(config.getProjectId()).thenReturn(projectId);
+        when(config.getCreateGitlabNote()).thenReturn(true);
+        when(config.getUpdateMrStatus()).thenReturn(true);
+        when(config.getDryRun()).thenReturn(false);
 
         // When
-        service.updateGitLabWithConflicts(projectId, conflicts, true, true, false);
+        service.updateGitLabWithConflicts(conflicts);
 
         // Then
         verify(gitLabClient).createMergeRequestNote(projectId, 1L, noteContent);
@@ -258,9 +263,10 @@ class ConflictAnalysisServiceTest {
         // Given
         Long projectId = 123L;
         List<MergeRequestConflict> conflicts = List.of();
+        when(config.getProjectId()).thenReturn(projectId);
 
         // When
-        service.updateGitLabWithConflicts(projectId, conflicts, true, true, true);
+        service.updateGitLabWithConflicts(conflicts);
 
         // Then
         verify(gitLabClient, never()).createMergeRequestNote(any(), any(), any());
@@ -273,8 +279,9 @@ class ConflictAnalysisServiceTest {
         // Given
         Long projectId = 123L;
         List<MergeRequestConflict> conflicts = List.of();
+        when(config.getProjectId()).thenReturn(projectId);
 
         // When & Then - should not throw exception
-        service.updateGitLabWithConflicts(projectId, conflicts, true, false, false);
+        service.updateGitLabWithConflicts(conflicts);
     }
 }

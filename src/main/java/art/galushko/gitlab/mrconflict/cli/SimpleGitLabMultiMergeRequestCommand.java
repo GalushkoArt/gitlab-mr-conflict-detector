@@ -171,7 +171,7 @@ public class SimpleGitLabMultiMergeRequestCommand implements Callable<Integer> {
             // Perform conflict detection
             log.info("Analyzing merge requests for conflicts...");
             List<MergeRequestConflict> conflicts = conflictAnalysisService.detectConflicts(
-                    mergeRequests, config.getIgnorePatterns());
+                    mergeRequests);
 
             // Generate and display output
             String output = conflictAnalysisService.formatConflicts(conflicts);
@@ -191,8 +191,7 @@ public class SimpleGitLabMultiMergeRequestCommand implements Callable<Integer> {
                 log.info("Updating GitLab with conflict information");
 
                 conflictAnalysisService.updateGitLabWithConflicts(
-                        config.getProjectId(), conflicts, config.getCreateGitlabNote(),
-                        config.getUpdateMrStatus(), config.getDryRun()
+                        conflicts
                 );
             }
 

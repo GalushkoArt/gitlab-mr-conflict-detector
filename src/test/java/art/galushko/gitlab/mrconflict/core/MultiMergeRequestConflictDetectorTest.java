@@ -1,7 +1,7 @@
 package art.galushko.gitlab.mrconflict.core;
 
-import art.galushko.gitlab.mrconflict.di.ServiceFactory;
 import art.galushko.gitlab.mrconflict.formatter.ConflictFormatter;
+import art.galushko.gitlab.mrconflict.formatter.DefaultConflictFormatter;
 import art.galushko.gitlab.mrconflict.model.MergeRequestInfo;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,8 +16,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class MultiMergeRequestConflictDetectorTest {
 
-    private final ConflictDetector detector = ServiceFactory.getInstance().getConflictDetector();
-    private final ConflictFormatter formatter = ServiceFactory.getInstance().getConflictFormatter();
+    private final ConflictDetector detector = new MultiMergeRequestConflictDetector(new IgnorePatternMatcher(true));
+    private final ConflictFormatter formatter = new DefaultConflictFormatter();
 
     @Test
     @DisplayName("Should detect direct conflicts between MRs targeting same branch")

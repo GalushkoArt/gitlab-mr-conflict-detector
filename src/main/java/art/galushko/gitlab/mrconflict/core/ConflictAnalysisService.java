@@ -99,12 +99,10 @@ public class ConflictAnalysisService {
      * Detects conflicts between merge requests.
      *
      * @param mergeRequests  list of merge requests to analyze
-     * @param ignorePatterns patterns for files/directories to ignore
      * @return list of detected conflicts
      */
-    public List<MergeRequestConflict> detectConflicts(List<MergeRequestInfo> mergeRequests,
-                                                      List<String> ignorePatterns) {
-        return conflictDetector.detectConflicts(mergeRequests, ignorePatterns);
+    public List<MergeRequestConflict> detectConflicts(List<MergeRequestInfo> mergeRequests) {
+        return conflictDetector.detectConflicts(mergeRequests, config.getIgnorePatterns());
     }
 
 
@@ -132,16 +130,11 @@ public class ConflictAnalysisService {
     /**
      * Updates GitLab with conflict information.
      *
-     * @param projectId         GitLab project ID
-     * @param conflicts         list of conflicts
-     * @param createNotes       whether to create notes on merge requests
-     * @param updateStatus      whether to update the merge request status
-     * @param dryRun            whether to perform a dry run (no changes)
+     * @param conflicts list of conflicts
      */
-    public void updateGitLabWithConflicts(Long projectId,
-                                          List<MergeRequestConflict> conflicts,
-                                          boolean createNotes, boolean updateStatus, boolean dryRun) {
+    public void updateGitLabWithConflicts(List<MergeRequestConflict> conflicts) {
         try {
+            var projectId = config.getProjectId();
             var mergeRequests = mergeRequestService.getMergeRequests(projectId, "opened");
             log.info("Processing {} merge requests for conflict updates", mergeRequests.size());
 
@@ -180,11 +173,11 @@ public class ConflictAnalysisService {
                             Current labels: {}
                             Resolved labels: {}""", mergeRequest.title(), projectId, labels, resolvedConflictLabels);
 
-                    if (updateStatus && !dryRun) {
+                    if (config.getUpdateMrStatus() && !config.getDryRun()) {
                         gitLabClient.updateMergeRequestStatus(projectId, mrId, labels);
                     }
 
-                    if (createNotes && !dryRun) {
+                    if (config.getCreateGitlabNote() && !config.getDryRun()) {
                         createConflictNote(projectId, mrId, relevantConflicts, resolvedConflictLabels);
                     }
                 }
