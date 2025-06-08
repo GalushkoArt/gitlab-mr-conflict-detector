@@ -1,382 +1,348 @@
 # GitLab MR Conflict Detector - Architecture Documentation
 
-## Overview
-
 This document provides a comprehensive overview of the GitLab MR Conflict Detector architecture, including component diagrams, integration points, and dependencies.
 
-## System Architecture
+## System Overview
 
-The GitLab MR Conflict Detector is designed with a modular architecture following SOLID principles. The system is organized into several key components that interact to detect conflicts between merge requests in GitLab.
-
-### High-Level Architecture
+The GitLab MR Conflict Detector is a Java application designed to detect potential merge conflicts between multiple merge requests in GitLab repositories. It integrates with the GitLab API to fetch merge request data, analyzes potential conflicts, and can update GitLab with the results.
 
 ```plantuml
 @startuml
+!theme plain
+skinparam componentStyle rectangle
+
 package "GitLab MR Conflict Detector" {
-  [CLI] --> [Core Services]
-  [Core Services] --> [GitLab Integration]
-  [Core Services] --> [Formatters]
-  [GitLab Integration] --> [External GitLab API]
-  [Core Services] --> [Security]
-  [Core Services] --> [Configuration]
+  [CLI Application] as CLI
+  [Configuration Service] as Config
+  [Conflict Analysis Service] as Core
+  [GitLab Integration] as GitLab
+  [Formatter] as Formatter
+  [Security] as Security
+  [Dependency Injection] as DI
 }
+
+[GitLab API] as GitLabAPI
+[User] as User
+
+User --> CLI : uses
+CLI --> Config : reads
+CLI --> Core : uses
+Core --> GitLab : uses
+GitLab --> GitLabAPI : calls
+Core --> Formatter : uses
+Config --> Security : validates
+DI --> CLI : injects dependencies
+DI --> Core : injects dependencies
+DI --> GitLab : injects dependencies
+Config --> DI : provides config
+DI --> Formatter : injects dependencies
+
 @enduml
 ```
 
-The system follows a layered architecture:
+## Component Architecture
 
-1. **CLI Layer**: Handles command-line arguments and user interaction
-2. **Core Services Layer**: Contains the business logic for conflict detection
-3. **Integration Layer**: Manages communication with GitLab API
-4. **Utility Layers**: Includes formatters, security, and configuration components
-
-## Component Diagrams
+The application is organized into several key components, each with specific responsibilities:
 
 ### CLI Component
 
+The CLI component provides the command-line interface for users to interact with the application.
+
 ```plantuml
 @startuml
+!theme plain
+skinparam componentStyle rectangle
+
 package "CLI" {
-  [SimpleGitLabMultiMergeRequestCommand] --> [ConflictAnalysisService]
-  [SimpleGitLabMultiMergeRequestCommand] --> [InputValidator]
+  [SimpleGitLabMultiMergeRequestCommand] as Command
+  [CommandLineOptions] as Options
 }
+
+[Configuration Service] as Config
+[Conflict Analysis Service] as Core
+
+Command --> Options : uses
+Command --> Config : configures
+Command --> Core : executes
 @enduml
 ```
 
-The CLI component is responsible for:
-- Parsing command-line arguments
-- Validating user inputs
-- Orchestrating the conflict detection process
-- Displaying results to the user
+### Configuration Component
 
-### Core Services Component
+The Configuration component manages application settings and GitLab credentials.
 
 ```plantuml
 @startuml
-package "Core Services" {
-  [ConflictAnalysisService] --> [MultiMergeRequestConflictDetector]
-  [ConflictAnalysisService] --> [GitLab4JMergeRequestService]
-  [ConflictAnalysisService] --> [ConflictFormatter]
-  
-  [MultiMergeRequestConflictDetector] --> [ConflictDetectionStrategy]
-  [DefaultConflictDetectionStrategy] ..|> [ConflictDetectionStrategy]
+!theme plain
+skinparam componentStyle rectangle
+
+package "Configuration" {
+  [ConfigurationService] as ConfigService
+  [ConfigLoader] as ConfigLoader
+  [Configuration] as Config
 }
+
+[CLI] as CLI
+[Security] as Security
+
+CLI --> ConfigService : uses
+ConfigService --> ConfigLoader : uses
+ConfigLoader --> Config : creates
+ConfigService --> Security : validates
 @enduml
 ```
 
-The Core Services component is responsible for:
-- Coordinating the conflict detection workflow
-- Analyzing merge requests for conflicts
-- Applying conflict detection strategies
-- Formatting conflict information
+### Core Component
+
+The Core component contains the business logic for detecting conflicts between merge requests.
+
+```plantuml
+@startuml
+!theme plain
+skinparam componentStyle rectangle
+
+package "Core" {
+  [ConflictAnalysisService] as AnalysisService
+  [MultiMergeRequestConflictDetector] as Detector
+  [IgnorePatternMatcher] as Matcher
+}
+
+[GitLab Integration] as GitLab
+[Formatter] as Formatter
+
+AnalysisService --> Detector : uses
+AnalysisService --> GitLab : fetches data
+AnalysisService --> Formatter : formats output
+Detector --> Matcher : uses
+@enduml
+```
 
 ### GitLab Integration Component
 
+The GitLab Integration component handles communication with the GitLab API.
+
 ```plantuml
 @startuml
+!theme plain
+skinparam componentStyle rectangle
+
 package "GitLab Integration" {
-  interface "GitLabClient" as GLC
-  interface "MergeRequestService" as MRS
-  
-  [GitLab4JClient] ..|> GLC
-  [GitLab4JMergeRequestService] ..|> MRS
-  
-  [GitLab4JMergeRequestService] --> [GitLab4JClient]
-  
-  [GitLabAuthenticationClient] --> [GitLab4JClient]
-  [GitLabProjectClient] --> [GitLab4JClient]
-  [GitLabBranchClient] --> [GitLab4JClient]
-  [GitLabMergeRequestClient] --> [GitLab4JClient]
+  [GitLab4JClient] as Client
+  [MergeRequestService] as MRService
 }
+
+[GitLab API] as GitLabAPI
+[Core] as Core
+
+Core --> Client : authenticates
+Client --> GitLabAPI : calls API
+MRService --> Client : uses
+Core --> MRService : uses
 @enduml
 ```
-
-The GitLab Integration component is responsible for:
-- Authenticating with GitLab API
-- Fetching merge requests from GitLab
-- Updating merge requests with conflict information
-- Handling GitLab API errors and exceptions
 
 ### Formatter Component
 
+The Formatter component handles the formatting of conflict detection results.
+
 ```plantuml
 @startuml
+!theme plain
+skinparam componentStyle rectangle
+
 package "Formatter" {
-  interface "ConflictFormatter" as CF
-  
-  [DefaultConflictFormatter] ..|> CF
+  [ConflictFormatter] as ConflictFormatter
+  [OutputFormatter] as OutputFormatter
 }
+
+[Core] as Core
+
+Core --> ConflictFormatter : formats conflicts
+ConflictFormatter --> OutputFormatter : uses
 @enduml
 ```
-
-The Formatter component is responsible for:
-- Converting conflict data into human-readable formats
-- Generating formatted output for console display
-- Creating formatted notes for GitLab merge requests
-
-### Security Component
-
-```plantuml
-@startuml
-package "Security" {
-  [CredentialService]
-  [InputValidator]
-}
-@enduml
-```
-
-The Security component is responsible for:
-- Securely handling GitLab credentials
-- Validating user inputs to prevent security vulnerabilities
-- Ensuring secure communication with GitLab API
 
 ## Integration Points
 
+The application integrates with external systems and components:
+
 ### GitLab API Integration
 
-The GitLab MR Conflict Detector integrates with the GitLab API through the GitLab4J library. The integration points include:
+The primary external integration is with the GitLab API:
 
-1. **Authentication**:
-   - Personal access token authentication
-   - Validation of token permissions
+```plantuml
+@startuml
+!theme plain
+skinparam componentStyle rectangle
 
-2. **Project Access**:
-   - Verification of access to specified GitLab projects
-   - Fetching project metadata
+package "GitLab MR Conflict Detector" {
+  [GitLab Integration] as GitLab
+}
 
-3. **Merge Request Operations**:
-   - Fetching open merge requests
-   - Adding comments to merge requests
-   - Updating merge request labels
-   - Retrieving merge request details (branches, files changed)
+[GitLab API] as GitLabAPI
 
-4. **Branch Operations**:
-   - Fetching branch information
-   - Comparing branches for conflicts
+GitLab --> GitLabAPI : REST API calls
 
-### Command-Line Integration
-
-The application integrates with the command-line interface through the Picocli library, which provides:
-
-1. **Command-Line Argument Parsing**:
-   - Support for various command-line options
-   - Automatic help generation
-   - Type conversion and validation
-
-2. **Exit Code Handling**:
-   - Standardized exit codes for different scenarios
-   - Error reporting through exit codes
-
-## Dependencies
-
-### External Dependencies
-
-The GitLab MR Conflict Detector relies on the following external dependencies:
-
-1. **GitLab4J-API**:
-   - Java client library for GitLab API
-   - Handles HTTP communication with GitLab
-   - Provides object models for GitLab resources
-
-2. **Picocli**:
-   - Command-line parsing framework
-   - Handles argument parsing and validation
-   - Generates help documentation
-
-3. **Lombok**:
-   - Reduces boilerplate code
-   - Provides annotations for generating getters, setters, constructors, etc.
-
-4. **SLF4J**:
-   - Logging facade
-   - Provides consistent logging interface
-
-5. **Logback**:
-   - Logging implementation
-   - Configurable logging backend
-
-### Internal Dependencies
-
-The internal components have the following dependencies:
-
-1. **CLI depends on**:
-   - Core Services
-   - Security (InputValidator)
-
-2. **Core Services depend on**:
-   - GitLab Integration
-   - Formatters
-   - Configuration
-
-3. **GitLab Integration depends on**:
-   - External GitLab API (via GitLab4J)
-
-4. **All components depend on**:
-   - Exception handling
-   - Utility classes
+note right of GitLabAPI
+  - Authentication via Personal Access Token
+  - Fetch merge requests
+  - Get changed files
+  - Create notes
+  - Update MR status
+end note
+@enduml
+```
 
 ## Data Flow
 
-The data flow through the system follows this pattern:
-
-1. User provides command-line arguments (GitLab URL, token, project ID, etc.)
-2. CLI component validates inputs and passes them to Core Services
-3. Core Services authenticate with GitLab and fetch merge requests
-4. Conflict detection is performed on the merge requests
-5. Conflicts are formatted for display
-6. GitLab is updated with conflict information (if requested)
-7. Results are displayed to the user
+The following diagram illustrates the data flow through the system:
 
 ```plantuml
 @startuml
+!theme plain
+skinparam componentStyle rectangle
+
 actor User
 participant CLI
-participant "Core Services" as Core
-participant "GitLab Integration" as GitLab
-participant "GitLab API" as API
-participant "Formatter" as Formatter
+participant Config
+participant Core
+participant GitLab
+participant Formatter
+database "GitLab API" as API
 
-User -> CLI: Command-line arguments
-CLI -> CLI: Validate inputs
-CLI -> Core: Process request
-Core -> GitLab: Authenticate
-GitLab -> API: Authentication request
-API --> GitLab: Authentication response
-GitLab --> Core: Authentication result
-Core -> GitLab: Fetch merge requests
-GitLab -> API: Get merge requests
-API --> GitLab: Merge request data
-GitLab --> Core: Merge request list
-Core -> Core: Detect conflicts
-Core -> Formatter: Format conflicts
-Formatter --> Core: Formatted output
-Core -> GitLab: Update with conflicts
-GitLab -> API: Update merge requests
-API --> GitLab: Update confirmation
-GitLab --> Core: Update result
-Core --> CLI: Processing result
-CLI --> User: Display results
+User -> CLI : Run command with options
+CLI -> Config : Load configuration
+Config -> CLI : Return configuration
+CLI -> Core : Analyze conflicts
+Core -> GitLab : Get merge requests
+GitLab -> API : API request
+API -> GitLab : Return MR data
+GitLab -> Core : Return MR data
+Core -> GitLab : Get changed files
+GitLab -> API : API request
+API -> GitLab : Return changed files
+GitLab -> Core : Return changed files
+Core -> Core : Detect conflicts
+Core -> Formatter : Format results
+Formatter -> Core : Return formatted output
+Core -> CLI : Return results
+CLI -> User : Display results
+alt Update GitLab
+  CLI -> GitLab : Create notes/update status
+  GitLab -> API : API request
+  API -> GitLab : Confirm update
+  GitLab -> CLI : Confirm update
+end
 @enduml
 ```
+
+## Dependencies
+
+The application has the following key dependencies:
+
+### Internal Dependencies
+
+```plantuml
+@startuml
+!theme plain
+skinparam componentStyle rectangle
+
+package "GitLab MR Conflict Detector" {
+  [CLI] as CLI
+  [Configuration] as Config
+  [Core] as Core
+  [GitLab Integration] as GitLab
+  [Formatter] as Formatter
+  [Security] as Security
+  [Model] as Model
+  [Utils] as Utils
+  [Exception] as Exception
+}
+
+CLI --> Config : depends on
+CLI --> Core : depends on
+Core --> GitLab : depends on
+Core --> Formatter : depends on
+Core --> Model : depends on
+GitLab --> Model : depends on
+GitLab --> Exception : depends on
+Config --> Security : depends on
+Config --> Model : depends on
+All --> Utils : depend on
+@enduml
+```
+
+### External Dependencies
+
+- **GitLab4J-API**: Java client for GitLab API
+- **Picocli**: Command-line interface framework
+- **Jackson**: YAML parsing for configuration files
+- **SLF4J/Logback**: Logging framework
+- **Lombok**: Reduces boilerplate code
+
+## Security Considerations
+
+```plantuml
+@startuml
+!theme plain
+skinparam componentStyle rectangle
+
+package "Security" {
+  [InputValidator] as Validator
+  [CredentialManager] as CredManager
+}
+
+[Configuration] as Config
+[GitLab Integration] as GitLab
+
+Config --> Validator : validates input
+Config --> CredManager : manages credentials
+GitLab --> CredManager : uses credentials
+@enduml
+```
+
+The application implements several security measures:
+- Input validation to prevent injection attacks
+- Secure credential handling (environment variables, secure storage)
+- Token validation and minimal permission checking
+- No exposure of GitLab token in logs or error messages
 
 ## Deployment Architecture
 
-The GitLab MR Conflict Detector is designed to be deployed in various environments:
-
-1. **Developer Workstation**:
-   - Run directly from command line
-   - Used for ad-hoc conflict detection
-
-2. **CI/CD Pipeline**:
-   - Integrated into GitLab CI/CD
-   - Run automatically on schedule or trigger
-   - Reports conflicts as part of pipeline
-
-3. **Server Deployment**:
-   - Run as a service on a server
-   - Scheduled execution
-   - Centralized conflict detection for multiple projects
+The application can be deployed in various ways:
 
 ```plantuml
 @startuml
+!theme plain
+skinparam componentStyle rectangle
+
 node "Developer Workstation" {
-  [GitLab MR Conflict Detector CLI]
+  [GitLab MR Conflict Detector] as App1
 }
 
 node "CI/CD Pipeline" {
-  [GitLab MR Conflict Detector Job]
+  [GitLab MR Conflict Detector] as App2
 }
 
-node "Server" {
-  [GitLab MR Conflict Detector Service]
-  [Scheduler]
+node "Scheduled Job Server" {
+  [GitLab MR Conflict Detector] as App3
 }
 
 cloud "GitLab" {
-  [GitLab API]
-  database "GitLab Database"
+  [GitLab API] as API
 }
 
-[GitLab MR Conflict Detector CLI] --> [GitLab API]
-[GitLab MR Conflict Detector Job] --> [GitLab API]
-[Scheduler] --> [GitLab MR Conflict Detector Service]
-[GitLab MR Conflict Detector Service] --> [GitLab API]
-[GitLab API] --> [GitLab Database]
-@enduml
-```
-
-## Security Architecture
-
-The security architecture of the GitLab MR Conflict Detector includes:
-
-1. **Authentication Security**:
-   - Secure handling of GitLab tokens
-   - No storage of credentials in plain text
-   - Support for environment variables for credential storage
-
-2. **Input Validation**:
-   - Validation of all user inputs
-   - Prevention of injection attacks
-   - Secure handling of URLs and IDs
-
-3. **API Communication Security**:
-   - HTTPS communication with GitLab API
-   - Proper error handling for API failures
-   - Rate limiting awareness
-
-```plantuml
-@startuml
-actor User
-participant CLI
-participant "Core Services" as Core
-participant "InputValidator" as IV
-participant "CredentialService" as CS
-participant "GitLabAuthenticationClient" as GAC
-participant "GitLab API" as GAPI
-
-User -> CLI: Provide credentials
-CLI -> IV: Validate inputs
-IV --> CLI: Validation result
-CLI -> CS: Process credentials
-CS -> GAC: Secure authentication
-GAC -> GAPI: HTTPS request
+App1 --> API : API calls
+App2 --> API : API calls
+App3 --> API : API calls
 @enduml
 ```
 
 ## Extension Points
 
-The GitLab MR Conflict Detector is designed with several extension points:
+The application is designed with several extension points:
 
-1. **Custom Conflict Detection Strategies**:
-   - Implement the `ConflictDetectionStrategy` interface
-   - Provide custom logic for determining conflicts
-
-2. **Custom Formatters**:
-   - Implement the `ConflictFormatter` interface
-   - Create custom output formats (JSON, HTML, etc.)
-
-3. **Alternative GitLab Clients**:
-   - Implement the `GitLabClient` interface
-   - Support different GitLab API libraries or versions
-
-4. **Additional Command-Line Options**:
-   - Extend the CLI component with new options
-   - Support additional use cases
-
-```plantuml
-@startuml
-interface "ConflictDetectionStrategy" as CDS
-interface "ConflictFormatter" as CF
-interface "GitLabClient" as GLC
-
-[DefaultConflictDetectionStrategy] ..|> CDS
-[CustomConflictDetectionStrategy] ..|> CDS
-
-[DefaultConflictFormatter] ..|> CF
-[JSONConflictFormatter] ..|> CF
-[HTMLConflictFormatter] ..|> CF
-
-[GitLab4JClient] ..|> GLC
-[CustomGitLabClient] ..|> GLC
-@enduml
-```
+1. **New Conflict Detection Algorithms**: The strategy pattern allows for new conflict detection algorithms.
+2. **Additional Output Formats**: The formatter component can be extended with new output formats.
+3. **Alternative GitLab API Clients**: The GitLab integration is abstracted behind interfaces.
+4. **Custom Configuration Sources**: The configuration system supports multiple sources.

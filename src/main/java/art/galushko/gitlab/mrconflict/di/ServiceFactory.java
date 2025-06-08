@@ -28,7 +28,7 @@ public class ServiceFactory {
     private MergeRequestService mergeRequestService;
     private ConflictDetector conflictDetector;
     private ConflictFormatter conflictFormatter;
-    private AppConfig config;
+    private final AppConfig config;
 
     private ServiceFactory(AppConfig config) {
         // Private constructor to enforce singleton pattern
