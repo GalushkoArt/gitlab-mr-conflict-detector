@@ -12,6 +12,9 @@ import java.util.stream.Collectors;
 
 /**
  * Implementation of MergeRequestService using GitLab4J API.
+ * This class provides methods for fetching merge request data from GitLab
+ * using the GitLab4J library. It handles retrieving merge requests, their
+ * changed files, and converting GitLab API objects to internal model objects.
  */
 @Slf4j
 @RequiredArgsConstructor
@@ -19,11 +22,17 @@ public class GitLab4JMergeRequestService implements MergeRequestService {
 
     private final GitLabClient gitLabClient;
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public List<MergeRequestInfo> getOpenMergeRequests(Long projectId) throws GitLabException {
         return getMergeRequests(projectId, "opened");
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public List<MergeRequestInfo> getMergeRequests(Long projectId, String state) throws GitLabException {
         log.info("Fetching merge requests for project {} with state: {}", projectId, state);
@@ -48,6 +57,9 @@ public class GitLab4JMergeRequestService implements MergeRequestService {
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public MergeRequestInfo getMergeRequest(Long projectId, Long mergeRequestIid) throws GitLabException {
         log.debug("Fetching merge request {} for project {}", mergeRequestIid, projectId);
@@ -64,6 +76,9 @@ public class GitLab4JMergeRequestService implements MergeRequestService {
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public Set<String> getChangedFiles(Long projectId, Long mergeRequestIid) throws GitLabException {
         log.debug("Fetching changed files for MR {} in project {}", mergeRequestIid, projectId);
@@ -103,6 +118,15 @@ public class GitLab4JMergeRequestService implements MergeRequestService {
         return changedFiles;
     }
 
+    /**
+     * Converts a GitLab API MergeRequest object to our internal MergeRequestInfo model.
+     * This method handles the conversion of data formats and determines if a merge request
+     * is in draft state based on its flags and title prefixes.
+     *
+     * @param mergeRequest the GitLab API merge request object
+     * @param changedFiles the set of files changed in this merge request
+     * @return a MergeRequestInfo object containing the relevant information
+     */
     protected MergeRequestInfo convertToMergeRequestInfo(MergeRequest mergeRequest, Set<String> changedFiles) {
         var isDraft = mergeRequest.getWorkInProgress() != null && mergeRequest.getWorkInProgress();
 
@@ -124,12 +148,7 @@ public class GitLab4JMergeRequestService implements MergeRequestService {
     }
 
     /**
-     * Gets merge requests that are ready for conflict analysis.
-     * This includes open merge requests, optionally filtering out draft/WIP merge requests.
-     *
-     * @param projectId GitLab project ID
-     * @param includeDraftMrs whether to include draft/WIP merge requests
-     * @return list of merge requests ready for analysis
+     * {@inheritDoc}
      */
     @Override
     public List<MergeRequestInfo> getMergeRequestsForConflictAnalysis(Long projectId, boolean includeDraftMrs) {

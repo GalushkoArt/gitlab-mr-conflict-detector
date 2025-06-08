@@ -10,6 +10,16 @@ import java.util.Set;
 
 /**
  * Represents a merge request with its metadata for conflict detection.
+ * This record encapsulates all the necessary information about a merge request
+ * that is needed for conflict detection and analysis.
+ * 
+ * @param id the unique identifier of the merge request (IID in GitLab terminology)
+ * @param title the title of the merge request
+ * @param sourceBranch the source branch of the merge request
+ * @param targetBranch the target branch of the merge request
+ * @param changedFiles the set of files changed in this merge request
+ * @param labels the set of labels applied to this merge request
+ * @param draft indicates whether this is a draft/WIP merge request
  */
 @Builder
 public record MergeRequestInfo(long id, String title, String sourceBranch, String targetBranch,

@@ -17,6 +17,9 @@ public class DefaultConflictFormatter implements ConflictFormatter {
     private static final int MAX_TITLE_LENGTH = 50;
     private static final int MAX_FILES_IN_NOTE = 10;
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public String formatConflict(MergeRequestConflict conflict) {
         String firstTitle = truncateTitle(conflict.firstMr().title());
@@ -26,6 +29,9 @@ public class DefaultConflictFormatter implements ConflictFormatter {
                 firstTitle, secondTitle, formatConflictDescription(conflict));
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public String formatConflicts(List<MergeRequestConflict> conflicts) {
         if (conflicts.isEmpty()) {
@@ -37,6 +43,9 @@ public class DefaultConflictFormatter implements ConflictFormatter {
                 .collect(Collectors.joining("\n"));
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public String formatConflictNote(List<MergeRequestConflict> conflicts, Long mergeRequestIid, List<MergeRequest> resolvedConflictMrs) {
         var note = new StringBuilder();
@@ -58,6 +67,12 @@ public class DefaultConflictFormatter implements ConflictFormatter {
         return note.toString();
     }
 
+    /**
+     * Appends information about resolved conflicts to the note.
+     *
+     * @param resolvedConflictMrs list of merge requests that previously had conflicts but are now resolved
+     * @param note the StringBuilder to append the information to
+     */
     private void appendInfoAboutResolvedConflicts(List<MergeRequest> resolvedConflictMrs, StringBuilder note) {
         if (resolvedConflictMrs.isEmpty()) {
             return;
@@ -76,6 +91,13 @@ public class DefaultConflictFormatter implements ConflictFormatter {
         note.append("\n\n");
     }
 
+    /**
+     * Appends information about a specific merge request conflict to the note.
+     *
+     * @param mergeRequestIid the ID of the current merge request
+     * @param conflict the conflict to append information about
+     * @param note the StringBuilder to append the information to
+     */
     private void appendMergeRequestConflictInfo(Long mergeRequestIid, MergeRequestConflict conflict, StringBuilder note) {
         var otherMr = conflict.firstMr().id() == mergeRequestIid ?
                 conflict.secondMr() : conflict.firstMr();
@@ -123,6 +145,9 @@ public class DefaultConflictFormatter implements ConflictFormatter {
 
     /**
      * Truncates merge request titles to a reasonable length for display.
+     *
+     * @param title the title to truncate
+     * @return the truncated title, or "Untitled" if the title is null or empty
      */
     private String truncateTitle(String title) {
         if (title == null || title.trim().isEmpty()) {

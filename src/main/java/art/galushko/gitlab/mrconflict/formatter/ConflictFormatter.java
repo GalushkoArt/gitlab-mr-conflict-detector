@@ -31,7 +31,7 @@ public interface ConflictFormatter {
      *
      * @param conflicts           list of conflicts
      * @param mergeRequestIid     merge request IID
-     * @param resolvedConflictMrs
+     * @param resolvedConflictMrs list of merge requests that previously had conflicts but are now resolved
      * @return formatted note
      */
     String formatConflictNote(List<MergeRequestConflict> conflicts, Long mergeRequestIid, List<MergeRequest> resolvedConflictMrs);
