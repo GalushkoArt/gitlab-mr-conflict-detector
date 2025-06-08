@@ -12,10 +12,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
- * Integration tests for SimpleGitLabMultiMergeRequestCommand that require a GitLab instance.
+ * Integration tests for ConflictDetectorApplication that require a GitLab instance.
  * These tests are separated from the basic tests to avoid interference.
  */
-class SimpleGitLabMultiMergeRequestCommandIntegrationTest {
+class ConflictDetectorApplicationIntegrationTest {
 
     private static final String ENV_GITLAB_URL = "GITLAB_TEST_URL";
     private static final String ENV_GITLAB_TOKEN = "GITLAB_TEST_TOKEN";
@@ -45,7 +45,7 @@ class SimpleGitLabMultiMergeRequestCommandIntegrationTest {
         PrintWriter outPrintWriter = new PrintWriter(outWriter);
 
         // When
-        var commandLine = new CommandLine(new SimpleGitLabMultiMergeRequestCommand());
+        var commandLine = new CommandLine(new ConflictDetectorApplication());
         commandLine.setOut(outPrintWriter);
         commandLine.setErr(outPrintWriter);
 

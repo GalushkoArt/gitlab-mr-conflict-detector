@@ -12,11 +12,11 @@ import java.io.StringWriter;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Integration tests for SimpleGitLabMultiMergeRequestCommand.
+ * Integration tests for ConflictDetectorApplication.
  * These tests require a GitLab instance to be available and configured via environment variables.
  * They will be skipped if the required environment variables are not set.
  */
-class SimpleGitLabMultiMergeRequestCommandTest {
+class ConflictDetectorApplicationTest {
 
     @Test
     @DisplayName("Should display help information")
@@ -26,7 +26,7 @@ class SimpleGitLabMultiMergeRequestCommandTest {
         PrintWriter outPrintWriter = new PrintWriter(outWriter);
 
         // When
-        var commandLine = new CommandLine(new SimpleGitLabMultiMergeRequestCommand());
+        var commandLine = new CommandLine(new ConflictDetectorApplication());
         commandLine.setOut(outPrintWriter);
         int exitCode = commandLine.execute("--help");
 
@@ -49,7 +49,7 @@ class SimpleGitLabMultiMergeRequestCommandTest {
         System.setErr(new PrintStream(errContent));
 
         // When
-        var commandLine = new CommandLine(new SimpleGitLabMultiMergeRequestCommand());
+        var commandLine = new CommandLine(new ConflictDetectorApplication());
         int exitCode = commandLine.execute(
                 "--gitlab-url", "https://gitlab.com",
                 "--project-id", "123"
@@ -68,7 +68,7 @@ class SimpleGitLabMultiMergeRequestCommandTest {
         System.setErr(new PrintStream(errContent));
 
         // When
-        var commandLine = new CommandLine(new SimpleGitLabMultiMergeRequestCommand());
+        var commandLine = new CommandLine(new ConflictDetectorApplication());
         int exitCode = commandLine.execute(
                 "--gitlab-url", "https://gitlab.com",
                 "--gitlab-token", "invalid!@#$%^&*()", // Invalid characters in token
@@ -88,7 +88,7 @@ class SimpleGitLabMultiMergeRequestCommandTest {
         System.setErr(new PrintStream(errContent));
 
         // When
-        var commandLine = new CommandLine(new SimpleGitLabMultiMergeRequestCommand());
+        var commandLine = new CommandLine(new ConflictDetectorApplication());
         int exitCode = commandLine.execute(
                 "--gitlab-token", "glpat-valid-token-format",
                 "--project-id", "123"
@@ -107,7 +107,7 @@ class SimpleGitLabMultiMergeRequestCommandTest {
         System.setErr(new PrintStream(errContent));
 
         // When
-        var commandLine = new CommandLine(new SimpleGitLabMultiMergeRequestCommand());
+        var commandLine = new CommandLine(new ConflictDetectorApplication());
         int exitCode = commandLine.execute(
                 "--gitlab-url", "invalid-url",
                 "--gitlab-token", "glpat-valid-token-format",
@@ -127,7 +127,7 @@ class SimpleGitLabMultiMergeRequestCommandTest {
         System.setErr(new PrintStream(errContent));
 
         // When
-        var commandLine = new CommandLine(new SimpleGitLabMultiMergeRequestCommand());
+        var commandLine = new CommandLine(new ConflictDetectorApplication());
         int exitCode = commandLine.execute(
                 "--gitlab-url", "https://gitlab.com",
                 "--gitlab-token", "glpat-valid-token-format",
@@ -147,7 +147,7 @@ class SimpleGitLabMultiMergeRequestCommandTest {
         System.setErr(new PrintStream(errContent));
 
         // When
-        var commandLine = new CommandLine(new SimpleGitLabMultiMergeRequestCommand());
+        var commandLine = new CommandLine(new ConflictDetectorApplication());
         int exitCode = commandLine.execute(
                 "--gitlab-url", "https://gitlab.com",
                 "--gitlab-token", "glpat-valid-token-format",

@@ -146,7 +146,7 @@ class DefaultConflictFormatterTest {
                 .firstMr(mr1)
                 .secondMr(mr3)
                 .conflictingFiles(Set.of("file2.java"))
-                .reason(ConflictReason.INDIRECT_CONFLICT)
+                .reason(ConflictReason.CROSS_BRANCH_CONFLICT)
                 .build();
 
         List<MergeRequestConflict> conflicts = Arrays.asList(conflict1, conflict2);

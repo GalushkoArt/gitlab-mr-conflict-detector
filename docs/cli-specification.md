@@ -5,7 +5,7 @@ The CLI (Command Line Interface) package provides the command-line interface for
 
 ## Key Components
 
-### SimpleGitLabMultiMergeRequestCommand
+### ConflictDetectorApplication
 The main class in the CLI package that implements the `Callable<Integer>` interface from the Picocli framework. This class serves as the entry point for the application and handles all CLI-related functionality.
 
 #### Responsibilities
@@ -53,20 +53,63 @@ The main class in the CLI package that implements the `Callable<Integer>` interf
 - **GitLab Client**: For authenticating with GitLab and validating project access
 
 ## Usage Examples
-```bash
-# Basic usage
-java -cp gitlab-mr-conflict-detector-1.0.0.jar \
-  art.galushko.gitlab.mrconflict.cli.SimpleGitLabMultiMergeRequestCommand \
-  --gitlab-url https://gitlab.example.com \
-  --gitlab-token your-access-token \
-  --project-id 123
 
-# With GitLab integration
-java -cp gitlab-mr-conflict-detector-1.0.0.jar \
-  art.galushko.gitlab.mrconflict.cli.SimpleGitLabMultiMergeRequestCommand \
-  --gitlab-url https://gitlab.example.com \
-  --gitlab-token your-access-token \
-  --project-id 123 \
-  --create-gitlab-note \
-  --update-mr-status
+### Basic Usage Examples
+
+```bash
+# Analyze all open MRs in a project
+java -jar gitlab-mr-conflict-detector.jar \
+  --gitlab-url https://gitlab.company.com \
+  --gitlab-token glpat-xxxxxxxxxxxxxxxxxxxx \
+  --project-id 42
+
+# Analyze specific MR with verbose output
+java -jar gitlab-mr-conflict-detector.jar \
+  --gitlab-url https://gitlab.company.com \
+  --gitlab-token glpat-xxxxxxxxxxxxxxxxxxxx \
+  --project-id 42 \
+  --mr-iid 123 \
+  --verbose
+
+# Dry run with ignore patterns
+java -jar gitlab-mr-conflict-detector.jar \
+  --gitlab-url https://gitlab.company.com \
+  --gitlab-token glpat-xxxxxxxxxxxxxxxxxxxx \
+  --project-id 42 \
+  --ignore-patterns "*.md,docs/,test/" \
+  --dry-run
+```
+
+### Configuration File Examples
+
+```bash
+# Using configuration file
+java -jar gitlab-mr-conflict-detector.jar \
+  --config-file /path/to/config.yml
+
+# Override config file settings
+java -jar gitlab-mr-conflict-detector.jar \
+  --config-file /path/to/config.yml \
+  --verbose \
+  --dry-run
+```
+
+## Troubleshooting
+
+### Common CLI Issues
+
+**Invalid Arguments:**
+- Check argument spelling and format
+- Use `--help` to see all available options
+- Ensure required arguments are provided
+
+**Configuration Conflicts:**
+- CLI arguments override configuration file settings
+- Environment variables override configuration file settings
+- CLI arguments override environment variables
+
+**Token Issues:**
+- Verify the token format (should start with 'glpat-')
+- Check token permissions and scopes
+- Ensure token hasn't expired
 ```

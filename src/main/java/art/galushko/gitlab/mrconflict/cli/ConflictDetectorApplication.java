@@ -23,7 +23,7 @@ import java.util.concurrent.Callable;
         mixinStandardHelpOptions = true,
         version = "1.1.0"
 )
-public class SimpleGitLabMultiMergeRequestCommand implements Callable<Integer> {
+public class ConflictDetectorApplication implements Callable<Integer> {
 
     private final ConfigurationService configurationService;
 
@@ -104,7 +104,7 @@ public class SimpleGitLabMultiMergeRequestCommand implements Callable<Integer> {
     private static final int EXIT_CONFLICTS_DETECTED = 1;
     private static final int EXIT_ERROR = 2;
 
-    public SimpleGitLabMultiMergeRequestCommand() {
+    public ConflictDetectorApplication() {
         this.configurationService = new ConfigurationService();
     }
 
@@ -230,7 +230,7 @@ public class SimpleGitLabMultiMergeRequestCommand implements Callable<Integer> {
      * @param args command-line arguments
      */
     public static void main(String[] args) {
-        int exitCode = new CommandLine(new SimpleGitLabMultiMergeRequestCommand()).execute(args);
+        int exitCode = new CommandLine(new ConflictDetectorApplication()).execute(args);
         System.exit(exitCode);
     }
 }

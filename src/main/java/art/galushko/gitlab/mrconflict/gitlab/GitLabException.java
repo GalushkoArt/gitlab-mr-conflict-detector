@@ -1,7 +1,6 @@
 package art.galushko.gitlab.mrconflict.gitlab;
 
 import art.galushko.gitlab.mrconflict.exception.ApplicationException;
-import art.galushko.gitlab.mrconflict.exception.ErrorCode;
 
 /**
  * Exception thrown when GitLab API operations fail.
@@ -14,7 +13,7 @@ public class GitLabException extends ApplicationException {
      * @param message the error message
      */
     public GitLabException(String message) {
-        super(ErrorCode.GITLAB_API_ERROR, message);
+        super(message);
     }
 
     /**
@@ -24,6 +23,6 @@ public class GitLabException extends ApplicationException {
      * @param cause the cause of the exception
      */
     public GitLabException(String message, Throwable cause) {
-        super(ErrorCode.GITLAB_API_ERROR, message, cause);
+        super(message, cause);
     }
 }

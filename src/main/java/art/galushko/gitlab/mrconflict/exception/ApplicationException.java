@@ -6,8 +6,6 @@ package art.galushko.gitlab.mrconflict.exception;
  */
 public class ApplicationException extends RuntimeException {
     
-    private final ErrorCode errorCode;
-    
     /**
      * Creates a new ApplicationException with the specified error code.
      *
@@ -15,30 +13,25 @@ public class ApplicationException extends RuntimeException {
      */
     public ApplicationException(ErrorCode errorCode) {
         super(errorCode.getMessage());
-        this.errorCode = errorCode;
     }
     
     /**
      * Creates a new ApplicationException with the specified error code and message.
      *
-     * @param errorCode the error code
      * @param message the error message
      */
-    public ApplicationException(ErrorCode errorCode, String message) {
+    public ApplicationException(String message) {
         super(message);
-        this.errorCode = errorCode;
     }
     
     /**
      * Creates a new ApplicationException with the specified error code, message, and cause.
      *
-     * @param errorCode the error code
      * @param message the error message
      * @param cause the cause of the exception
      */
-    public ApplicationException(ErrorCode errorCode, String message, Throwable cause) {
+    public ApplicationException(String message, Throwable cause) {
         super(message, cause);
-        this.errorCode = errorCode;
     }
     
     /**
@@ -49,24 +42,5 @@ public class ApplicationException extends RuntimeException {
      */
     public ApplicationException(ErrorCode errorCode, Throwable cause) {
         super(errorCode.getMessage(), cause);
-        this.errorCode = errorCode;
-    }
-    
-    /**
-     * Gets the error code.
-     *
-     * @return the error code
-     */
-    public ErrorCode getErrorCode() {
-        return errorCode;
-    }
-    
-    /**
-     * Gets the exit code for the application.
-     *
-     * @return the exit code
-     */
-    public int getExitCode() {
-        return errorCode.getExitCode();
     }
 }

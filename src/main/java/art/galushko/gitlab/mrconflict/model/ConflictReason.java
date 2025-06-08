@@ -10,11 +10,6 @@ public enum ConflictReason {
     DIRECT_CONFLICT,
 
     /**
-     * Indirect conflict: MRs have a dependency chain and modify the same files.
-     */
-    INDIRECT_CONFLICT,
-
-    /**
      * Cross-branch conflict: MRs target different branches but modify the same files
      * and the branches will eventually merge.
      */
