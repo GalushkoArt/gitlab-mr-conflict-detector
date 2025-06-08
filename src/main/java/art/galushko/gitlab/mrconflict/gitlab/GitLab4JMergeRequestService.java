@@ -104,6 +104,14 @@ public class GitLab4JMergeRequestService implements MergeRequestService {
     }
 
     protected MergeRequestInfo convertToMergeRequestInfo(MergeRequest mergeRequest, Set<String> changedFiles) {
+        var isDraft = mergeRequest.getWorkInProgress() != null && mergeRequest.getWorkInProgress();
+
+        // Also check title prefixes for older GitLab versions that don't support the draft flag
+        var title = mergeRequest.getTitle();
+        if (!isDraft && title != null) {
+            isDraft = title.startsWith("Draft:") || title.startsWith("WIP:") || title.startsWith("[WIP]");
+        }
+
         return MergeRequestInfo.builder()
                 .id(mergeRequest.getIid())
                 .title(mergeRequest.getTitle())
@@ -111,36 +119,43 @@ public class GitLab4JMergeRequestService implements MergeRequestService {
                 .targetBranch(mergeRequest.getTargetBranch())
                 .changedFiles(changedFiles)
                 .labels(new HashSet<>(mergeRequest.getLabels()))
+                .draft(isDraft)
                 .build();
     }
 
     /**
      * Gets merge requests that are ready for conflict analysis.
-     * This includes open merge requests that are not in draft state.
+     * This includes open merge requests, optionally filtering out draft/WIP merge requests.
      *
      * @param projectId GitLab project ID
+     * @param includeDraftMrs whether to include draft/WIP merge requests
      * @return list of merge requests ready for analysis
-     * @throws GitLabException if merge requests cannot be fetched
      */
-    public List<MergeRequestInfo> getMergeRequestsForConflictAnalysis(Long projectId) throws GitLabException {
+    @Override
+    public List<MergeRequestInfo> getMergeRequestsForConflictAnalysis(Long projectId, boolean includeDraftMrs) {
         log.info("Fetching merge requests for conflict analysis in project {}", projectId);
 
-        List<MergeRequestInfo> openMRs = getOpenMergeRequests(projectId);
+        var openMRs = getOpenMergeRequests(projectId);
 
-        // Filter out draft/WIP merge requests as they're typically not ready for conflict analysis
-        return openMRs.stream()
-                .filter(mr -> !isDraftMergeRequest(mr))
-                .collect(Collectors.toList());
+        // Filter out draft/WIP merge requests if includeDraftMrs is false
+        if (!includeDraftMrs) {
+            log.debug("Filtering out draft/WIP merge requests");
+            return openMRs.stream()
+                    .filter(mr -> !isDraftMergeRequest(mr))
+                    .collect(Collectors.toList());
+        }
+
+        return openMRs;
     }
 
     /**
-     * Checks if a merge request is in draft state.
-     * Draft MRs are typically prefixed with "Draft:", "WIP:", or "[WIP]"
+     * Checks if a merge request is in the draft state.
+     * Draft MRs are identified by their draft flag or by title prefixes like "Draft:", "WIP:", or "[WIP]"
+     * 
+     * @param mr the merge request to check
+     * @return true if the merge request is a draft, false otherwise
      */
     private boolean isDraftMergeRequest(MergeRequestInfo mr) {
-        // Note: This is a simple heuristic. In a real implementation,
-        // you might want to check the actual draft status from the GitLab API
-        // if available in the MergeRequest model.
-        return false; // For now, include all MRs
+        return mr.draft();
     }
 }

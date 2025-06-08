@@ -86,10 +86,11 @@ public class ConflictAnalysisService {
      *
      * @param projectId               GitLab project ID
      * @param specificMergeRequestIid specific merge request IID (optional)
+     * @param includeDraftMrs         whether to include draft/WIP merge requests
      * @return list of merge requests
      * @throws GitLabException if merge requests cannot be fetched
      */
-    public List<MergeRequestInfo> fetchMergeRequests(Long projectId, Long specificMergeRequestIid)
+    public List<MergeRequestInfo> fetchMergeRequests(Long projectId, Long specificMergeRequestIid, boolean includeDraftMrs)
             throws GitLabException {
 
         // Validate project ID
@@ -120,7 +121,7 @@ public class ConflictAnalysisService {
         } else {
             // Fetch all open merge requests for conflict analysis
             log.info("Fetching all open merge requests for conflict analysis");
-            return mergeRequestService.getOpenMergeRequests(projectId);
+            return mergeRequestService.getMergeRequestsForConflictAnalysis(projectId, includeDraftMrs);
         }
     }
 

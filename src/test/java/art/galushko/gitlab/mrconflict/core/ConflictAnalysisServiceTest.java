@@ -100,7 +100,7 @@ class ConflictAnalysisServiceTest {
         when(mergeRequestService.getMergeRequest(projectId, mrIid)).thenReturn(mr);
 
         // When
-        List<MergeRequestInfo> result = service.fetchMergeRequests(projectId, mrIid);
+        List<MergeRequestInfo> result = service.fetchMergeRequests(projectId, mrIid, true);
 
         // Then
         assertThat(result).hasSize(1);
@@ -119,15 +119,15 @@ class ConflictAnalysisServiceTest {
             MergeRequestInfo.builder().id(2).build()
         );
 
-        when(mergeRequestService.getOpenMergeRequests(projectId)).thenReturn(mrs);
+        when(mergeRequestService.getMergeRequestsForConflictAnalysis(projectId, true)).thenReturn(mrs);
 
         // When
-        List<MergeRequestInfo> result = service.fetchMergeRequests(projectId, null);
+        List<MergeRequestInfo> result = service.fetchMergeRequests(projectId, null, true);
 
         // Then
         assertThat(result).hasSize(2);
         assertThat(result).isEqualTo(mrs);
-        verify(mergeRequestService).getOpenMergeRequests(projectId);
+        verify(mergeRequestService).getMergeRequestsForConflictAnalysis(projectId, true);
         verify(mergeRequestService, never()).getMergeRequest(any(), any());
     }
 

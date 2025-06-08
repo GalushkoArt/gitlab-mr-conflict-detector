@@ -11,6 +11,16 @@ import java.util.Set;
 public interface MergeRequestService {
 
     /**
+     * Fetches merge requests that are ready for conflict analysis.
+     * This includes open merge requests, optionally filtering out draft/WIP merge requests.
+     *
+     * @param projectId GitLab project ID
+     * @param includeDraftMrs whether to include draft/WIP merge requests
+     * @return list of merge requests ready for analysis
+     */
+    List<MergeRequestInfo> getMergeRequestsForConflictAnalysis(Long projectId, boolean includeDraftMrs);
+
+    /**
      * Fetches all open merge requests for a project.
      *
      * @param projectId GitLab project ID

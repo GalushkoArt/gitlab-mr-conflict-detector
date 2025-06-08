@@ -2,6 +2,8 @@ package art.galushko.gitlab.mrconflict.gitlab;
 
 import art.galushko.gitlab.mrconflict.security.CredentialService;
 import art.galushko.gitlab.mrconflict.security.InputValidator;
+import art.galushko.gitlab.mrconflict.utils.ThrowingFunction;
+import art.galushko.gitlab.mrconflict.utils.ThrowingRunnable;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.extern.slf4j.Slf4j;
@@ -11,10 +13,12 @@ import org.gitlab4j.api.GitLabApiException;
 import org.gitlab4j.api.models.*;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
 import static art.galushko.gitlab.mrconflict.utils.CollectionUtils.mapCollection;
 import static art.galushko.gitlab.mrconflict.utils.ThrowingFunction.wrap;
@@ -82,23 +86,8 @@ public class GitLab4JClient implements GitLabClient {
                 .build();
     }
 
-    /**
-     * Clears all caches.
-     */
-    public void clearCaches() {
-        log.debug("Clearing all GitLab API caches");
-        projectByIdCache.invalidateAll();
-        projectByPathCache.invalidateAll();
-        branchesCache.invalidateAll();
-        protectedBranchesCache.invalidateAll();
-        mergeRequestsCache.invalidateAll();
-        mergeRequestCache.invalidateAll();
-        mergeRequestChangesCache.invalidateAll();
-        currentUseCache.invalidateAll();
-    }
-
     @Override
-    public GitLab4JClient authenticate(String gitlabUrl, String accessToken) throws GitLabException {
+    public GitLab4JClient authenticate(String gitlabUrl, String accessToken) {
         try {
             // Validate token format
             if (!credentialService.isValidToken(accessToken)) {
@@ -128,7 +117,7 @@ public class GitLab4JClient implements GitLabClient {
         }
     }
 
-    private User getCurrentUser() throws GitLabException {
+    private User getCurrentUser() {
         try {
             return currentUseCache.get("user", wrap(id -> gitLabApi.getUserApi().getCurrentUser()));
         } catch (RuntimeException e) {
@@ -137,7 +126,7 @@ public class GitLab4JClient implements GitLabClient {
     }
 
     @Override
-    public Project getProject(Long projectId) throws GitLabException {
+    public Project getProject(Long projectId) {
         try {
             return projectByIdCache.get(projectId, wrap(gitLabApi.getProjectApi()::getProject));
         } catch (RuntimeException e) {
@@ -146,7 +135,7 @@ public class GitLab4JClient implements GitLabClient {
     }
 
     @Override
-    public Project getProject(String projectPath) throws GitLabException {
+    public Project getProject(String projectPath) {
         try {
             return projectByPathCache.get(projectPath, wrap(gitLabApi.getProjectApi()::getProject));
         } catch (RuntimeException e) {
@@ -155,7 +144,7 @@ public class GitLab4JClient implements GitLabClient {
     }
 
     @Override
-    public List<Branch> getBranches(Long projectId) throws GitLabException {
+    public List<Branch> getBranches(Long projectId) {
         try {
             return branchesCache.get(projectId, wrap(gitLabApi.getRepositoryApi()::getBranches));
         } catch (RuntimeException e) {
@@ -164,7 +153,7 @@ public class GitLab4JClient implements GitLabClient {
     }
 
     @Override
-    public List<String> getProtectedBranches(Long projectId) throws GitLabException {
+    public List<String> getProtectedBranches(Long projectId) {
         try {
             return protectedBranchesCache.get(
                     projectId,
@@ -177,7 +166,7 @@ public class GitLab4JClient implements GitLabClient {
     }
 
     @Override
-    public Optional<Branch> getBranch(Long projectId, String branchName) throws GitLabException {
+    public Optional<Branch> getBranch(Long projectId, String branchName) {
         try {
             // Validate inputs
             if (branchName == null || branchName.trim().isEmpty()) {
@@ -203,24 +192,41 @@ public class GitLab4JClient implements GitLabClient {
     }
 
     @Override
-    public List<MergeRequest> getMergeRequests(Long projectId, String state) throws GitLabException {
-        try {
-            var filter = new MergeRequestFilter().withProjectId(projectId).withState(MergeRequestState.forValue(state));
-            return mergeRequestsCache.get(
-                    state + projectId,
-                    wrap(id -> gitLabApi.getMergeRequestApi().getMergeRequests(filter))
-            );
-        } catch (RuntimeException e) {
-            throw new GitLabException("Failed to get merge requests for project: " + projectId, e);
-        }
+    public List<MergeRequest> getMergeRequests(Long projectId, String state) {
+        var filter = new MergeRequestFilter().withProjectId(projectId).withState(MergeRequestState.forValue(state));
+
+        // Use cache if available
+        return mergeRequestsCache.get(
+                state + projectId,
+                withRetry(id -> {
+                            // Get all pages of merge requests with pagination
+                            log.debug("Fetching all merge requests for project {} with state {}", projectId, state);
+                            List<MergeRequest> allMergeRequests = new ArrayList<>();
+
+                            // Use Pager to handle pagination automatically
+                            var pager = gitLabApi.getMergeRequestApi().getMergeRequests(filter, 20);
+                            while (pager.hasNext()) {
+                                allMergeRequests.addAll(pager.next());
+                                log.debug("Fetched page of merge requests, total so far: {}", allMergeRequests.size());
+                            }
+
+                            log.debug("Fetched a total of {} merge requests", allMergeRequests.size());
+                            return allMergeRequests;
+                        },
+                        "Failed to get merge requests for project: " + projectId
+                )
+        );
     }
 
     @Override
-    public MergeRequest getMergeRequest(Long projectId, Long mergeRequestIid) throws GitLabException {
+    public MergeRequest getMergeRequest(Long projectId, Long mergeRequestIid) {
         try {
             return mergeRequestCache.get(
                     getMrCacheKey(projectId, mergeRequestIid),
-                    wrap(id -> gitLabApi.getMergeRequestApi().getMergeRequest(projectId, mergeRequestIid))
+                    withRetry(
+                            id-> gitLabApi.getMergeRequestApi().getMergeRequest(projectId, mergeRequestIid),
+                            "Failed to get merge request " + mergeRequestIid + " for project: " + projectId
+                    )
             );
         } catch (RuntimeException e) {
             throw new GitLabException("Failed to get merge request " + mergeRequestIid +
@@ -230,27 +236,25 @@ public class GitLab4JClient implements GitLabClient {
 
     @Override
     public void updateMergeRequestStatus(Long projectId, Long mergeRequestIid, Set<String> labels) {
-        try {
-            // Note: GitLab doesn't allow direct status updates via API for conflict detection
-            // This would typically be handled by GitLab's built-in conflict detection
-            // We can add labels or update description instead
-            log.debug("Updating labels for merge request IID: {} of project ID: {}", mergeRequestIid, projectId);
+        // Note: GitLab doesn't allow direct status updates via API for conflict detection
+        // This would typically be handled by GitLab's built-in conflict detection
+        // We can add labels or update the description instead
+        log.debug("Updating labels for merge request IID: {} of project ID: {}", mergeRequestIid, projectId);
 
-            // Update the merge request with new labels
-            var updatedMr = gitLabApi.getMergeRequestApi().updateMergeRequest(projectId, mergeRequestIid,
-                    null, null, null, null, null, String.join(",", labels), null, null, null, null, null);
+        // Update the merge request with new labels
+        var updatedMr = withRetry(
+                id -> gitLabApi.getMergeRequestApi().updateMergeRequest(projectId, mergeRequestIid,
+                        null, null, null, null, null, String.join(",", labels), null, null, null, null, null),
+                "Failed to update merge request status"
+        ).apply(mergeRequestIid);
 
-            // Update cache with the updated merge request
-            mergeRequestCache.put(getMrCacheKey(projectId, mergeRequestIid), updatedMr);
-            log.debug("Updated MR {} labels based on conflict status", mergeRequestIid);
-
-        } catch (GitLabApiException e) {
-            throw new GitLabException("Failed to update merge request status", e);
-        }
+        // Update cache with the updated merge request
+        mergeRequestCache.put(getMrCacheKey(projectId, mergeRequestIid), updatedMr);
+        log.debug("Updated MR {} labels based on conflict status", mergeRequestIid);
     }
 
     @Override
-    public boolean hasProjectAccess(Long projectId) throws GitLabException {
+    public boolean hasProjectAccess(Long projectId) {
         try {
             gitLabApi.getProjectApi().getProject(projectId);
             return true;
@@ -263,7 +267,7 @@ public class GitLab4JClient implements GitLabClient {
     }
 
     @Override
-    public String getDefaultBranch(Long projectId) throws GitLabException {
+    public String getDefaultBranch(Long projectId) {
         try {
             return getProject(projectId).getDefaultBranch();
         } catch (Exception e) {
@@ -272,7 +276,7 @@ public class GitLab4JClient implements GitLabClient {
     }
 
     @Override
-    public boolean isBranchProtected(Long projectId, String branchName) throws GitLabException {
+    public boolean isBranchProtected(Long projectId, String branchName) {
         try {
             return getProtectedBranches(projectId).contains(branchName);
         } catch (Exception e) {
@@ -281,13 +285,16 @@ public class GitLab4JClient implements GitLabClient {
     }
 
     @Override
-    public List<Diff> getMergeRequestChanges(Long projectId, Long mergeRequestIid) throws GitLabException {
+    public List<Diff> getMergeRequestChanges(Long projectId, Long mergeRequestIid) {
         try {
             return mergeRequestChangesCache.get(
                     getMrCacheKey(projectId, mergeRequestIid),
-                    wrap(id -> gitLabApi.getMergeRequestApi()
-                            .getMergeRequestChanges(projectId, mergeRequestIid)
-                            .getChanges())
+                    withRetry(
+                            id -> gitLabApi.getMergeRequestApi()
+                                    .getMergeRequestChanges(projectId, mergeRequestIid)
+                                    .getChanges(),
+                            "Failed to get changes for MR " + mergeRequestIid
+                    )
             );
         } catch (RuntimeException e) {
             throw new GitLabException("Failed to get changes for MR " + mergeRequestIid, e);
@@ -295,25 +302,86 @@ public class GitLab4JClient implements GitLabClient {
     }
 
     @Override
-    public void createMergeRequestNote(Long projectId, Long mergeRequestIid, String noteContent) throws GitLabException {
-        try {
-            // Validate inputs
-            if (mergeRequestIid == null || mergeRequestIid <= 0) {
-                throw new GitLabException("Invalid merge request IID: " + mergeRequestIid);
-            }
-
-            if (noteContent == null || noteContent.trim().isEmpty()) {
-                throw new GitLabException("Note content cannot be empty");
-            }
-
-            gitLabApi.getNotesApi().createMergeRequestNote(projectId, mergeRequestIid, noteContent);
-        } catch (GitLabApiException e) {
-            throw new GitLabException("Failed to create note for MR " + mergeRequestIid, e);
+    public void createMergeRequestNote(Long projectId, Long mergeRequestIid, String noteContent) {
+        // Validate inputs
+        if (mergeRequestIid == null || mergeRequestIid <= 0) {
+            throw new GitLabException("Invalid merge request IID: " + mergeRequestIid);
         }
+
+        if (noteContent == null || noteContent.trim().isEmpty()) {
+            throw new GitLabException("Note content cannot be empty");
+        }
+
+        executeWithRetry(
+                () -> gitLabApi.getNotesApi().createMergeRequestNote(projectId, mergeRequestIid, noteContent),
+                "Failed to create note for MR " + mergeRequestIid
+        );
     }
 
     @NotNull
     private static String getMrCacheKey(Long projectId, Long mergeRequestIid) {
         return projectId + "_" + mergeRequestIid;
+    }
+
+    /**
+     * Executes a GitLab API call with retry logic for transient failures.
+     * This method will retry the API call if it fails with a 429 (Too Many Requests) or
+     * 5xx (Server Error) status code.
+     *
+     * @param <T>          the return type of the API call
+     * @param operation    the API call to execute
+     * @param errorMessage the error message to use if all retries fail
+     * @return the result of the API call
+     * @throws GitLabException if the API call fails after all retries
+     */
+    private <T, R> Function<T, R> withRetry(ThrowingFunction<T, R> operation, String errorMessage) {
+        return t -> {
+            long maxRetries = 3;
+            long retryDelayMs = 500;
+
+            for (long attempt = 1L; attempt <= maxRetries; attempt++) {
+                try {
+                    return operation.apply(t);
+                } catch (Exception e) {
+                    // Check if it's a GitLab API exception with a retryable status code
+                    if (e instanceof GitLabApiException apiEx) {
+                        int statusCode = apiEx.getHttpStatus();
+
+                        // Retry on rate limiting (429) or server errors (5xx)
+                        boolean shouldRetry = statusCode == 429 || (statusCode >= 500 && statusCode < 600);
+
+                        if (shouldRetry && attempt < maxRetries) {
+                            // Log the failure and retry
+                            log.warn("GitLab API call failed with status {}, retrying ({}/{}): {}",
+                                    statusCode, attempt, maxRetries, apiEx.getMessage());
+
+                            try {
+                                Thread.sleep(retryDelayMs * attempt);
+                            } catch (InterruptedException ie) {
+                                Thread.currentThread().interrupt();
+                                throw new GitLabException("Retry interrupted", ie);
+                            }
+                            continue;
+                        }
+                    }
+
+                    // If we get here, either it's not a retryable error or we've exhausted retries
+                    if (attempt == maxRetries) {
+                        log.error("GitLab API call failed after {} attempts: {}", maxRetries, e.getMessage());
+                    }
+                    throw new GitLabException(errorMessage, e);
+                }
+            }
+
+            // This should never happen, but just in case
+            throw new GitLabException(errorMessage + " (unexpected error)");
+        };
+    }
+
+    private void executeWithRetry(ThrowingRunnable operation, String errorMessage) {
+        withRetry(id -> {
+            operation.run();
+            return null;
+        }, errorMessage).apply(true);
     }
 }

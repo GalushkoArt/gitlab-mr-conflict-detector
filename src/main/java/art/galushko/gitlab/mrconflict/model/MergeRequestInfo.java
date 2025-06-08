@@ -13,7 +13,7 @@ import java.util.Set;
  */
 @Builder
 public record MergeRequestInfo(long id, String title, String sourceBranch, String targetBranch,
-                               Set<String> changedFiles, Set<String> labels) {
+                               Set<String> changedFiles, Set<String> labels, boolean draft) {
 
     /**
      * Gets the common files between this MR and another MR.

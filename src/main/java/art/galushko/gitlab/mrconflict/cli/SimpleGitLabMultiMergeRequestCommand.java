@@ -84,6 +84,13 @@ public class SimpleGitLabMultiMergeRequestCommand implements Callable<Integer> {
     )
     private boolean verbose;
 
+    @CommandLine.Option(
+            names = {"--include-draft-mrs"},
+            description = "Include draft/WIP merge requests in conflict analysis",
+            defaultValue = "false"
+    )
+    private boolean includeDraftMrs;
+
     private static final int EXIT_SUCCESS = 0;
     private static final int EXIT_CONFLICTS_DETECTED = 1;
     private static final int EXIT_ERROR = 2;
@@ -124,7 +131,7 @@ public class SimpleGitLabMultiMergeRequestCommand implements Callable<Integer> {
             log.info("Analyzing merge requests for project ID: {}", projectId);
 
             // Fetch merge requests from GitLab
-            List<MergeRequestInfo> mergeRequests = conflictAnalysisService.fetchMergeRequests(projectId, mergeRequestIid);
+            List<MergeRequestInfo> mergeRequests = conflictAnalysisService.fetchMergeRequests(projectId, mergeRequestIid, includeDraftMrs);
 
             if (mergeRequests.isEmpty()) {
                 log.info("No merge requests found for analysis");
@@ -134,8 +141,8 @@ public class SimpleGitLabMultiMergeRequestCommand implements Callable<Integer> {
 
             log.info("Found {} merge requests for analysis", mergeRequests.size());
 
-            // Get ignore patterns (empty for now, can be extended)
-            List<String> ignorePatterns = List.of("ignored.txt", "ignored_dir/*");
+            // Get to ignore patterns (empty for now, can be extended)
+            List<String> ignorePatterns = List.of("**/ignored.txt", "ignored_dir/*");
 
             // Perform conflict detection
             List<MergeRequestConflict> conflicts = conflictAnalysisService.detectConflicts(mergeRequests, ignorePatterns);

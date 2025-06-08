@@ -1,5 +1,6 @@
 package art.galushko.gitlab.mrconflict.config;
 
+import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 
 import java.nio.file.FileSystems;
@@ -7,11 +8,20 @@ import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 
 /**
- * Enhanced file pattern matcher that supports simple ignore patterns.
+ * Enhanced file pattern matcher that supports .gitignore-style patterns.
  * This class provides functionality to match file paths against patterns,
- * similar to .gitignore patterns.
+ * similar to .gitignore patterns, including:
+ * 
+ * <ul>
+ *   <li>Basic glob patterns with * and ?</li>
+ *   <li>Directory-specific patterns (ending with /)</li>
+ *   <li>Negation patterns (starting with !)</li>
+ *   <li>Double-asterisk for matching across directories (**)</li>
+ *   <li>Character classes ([abc], [0-9])</li>
+ * </ul>
  */
 @Slf4j
+@Builder
 public class IgnorePatternMatcher implements PatternMatcher {
     /**
      * Flag indicating whether pattern matching should be case-sensitive.
@@ -20,19 +30,36 @@ public class IgnorePatternMatcher implements PatternMatcher {
     private final boolean caseSensitive;
 
     /**
-     * Constructs a new IgnorePatternMatcher with the specified case sensitivity.
+     * Flag indicating whether to use extended glob syntax.
+     * If true, patterns like ** will match across directories.
+     */
+    private final boolean extendedGlob;
+
+    /**
+     * Constructs a new IgnorePatternMatcher with the specified options.
+     *
+     * @param caseSensitive true for case-sensitive matching, false for case-insensitive matching
+     * @param extendedGlob true to enable extended glob syntax, false to use basic glob
+     */
+    public IgnorePatternMatcher(boolean caseSensitive, boolean extendedGlob) {
+        this.caseSensitive = caseSensitive;
+        this.extendedGlob = extendedGlob;
+    }
+
+    /**
+     * Constructs a new IgnorePatternMatcher with the specified case sensitivity and extended glob enabled.
      *
      * @param caseSensitive true for case-sensitive matching, false for case-insensitive matching
      */
     public IgnorePatternMatcher(boolean caseSensitive) {
-        this.caseSensitive = caseSensitive;
+        this(caseSensitive, true);
     }
 
     /**
-     * Constructs a new IgnorePatternMatcher with default case-sensitive matching.
+     * Constructs a new IgnorePatternMatcher with default case-sensitive matching and extended glob enabled.
      */
     public IgnorePatternMatcher() {
-        this(true);
+        this(true, true);
     }
 
     /**
@@ -49,9 +76,21 @@ public class IgnorePatternMatcher implements PatternMatcher {
             return false;
         }
 
+        // Handle negation patterns (patterns starting with !)
+        boolean negated = false;
+        String effectivePattern = pattern;
+        if (pattern.startsWith("!")) {
+            negated = true;
+            effectivePattern = pattern.substring(1);
+            // If there's only the ! character, it's not a valid pattern
+            if (effectivePattern.isEmpty()) {
+                return false;
+            }
+        }
+
         // Normalize paths for consistency
         String normalizedPath = normalizePath(filePath);
-        String normalizedPattern = normalizePath(pattern);
+        String normalizedPattern = normalizePath(effectivePattern);
 
         // For case-insensitive matching, convert to lowercase
         if (!caseSensitive) {
@@ -59,47 +98,124 @@ public class IgnorePatternMatcher implements PatternMatcher {
             normalizedPattern = normalizedPattern.toLowerCase();
         }
 
-        // Handle directory patterns (ending with /)
-        if (pattern.endsWith("/")) {
-            String dirPattern = normalizedPattern.substring(0, normalizedPattern.length() - 1);
-            return normalizedPath.equals(dirPattern) || normalizedPath.startsWith(dirPattern + "/");
+        // Check for exact match first (most common and fastest check)
+        boolean matches = normalizedPath.equals(normalizedPattern);
+
+        // If no exact match, try other pattern types
+        if (!matches) {
+            // Handle directory patterns (ending with /)
+            if (effectivePattern.endsWith("/")) {
+                matches = matchesDirectoryPattern(normalizedPath, normalizedPattern);
+            } else {
+                // Handle glob patterns
+                matches = matchesGlobPattern(normalizedPath, normalizedPattern);
+            }
         }
 
-        // Handle exact matches
-        if (normalizedPath.equals(normalizedPattern)) {
-            return true;
-        }
+        // Apply negation if needed
+        return negated ? !matches : matches;
+    }
 
-        // Handle glob patterns
+    /**
+     * Checks if a path matches a directory pattern.
+     * A directory pattern is a pattern that ends with a slash.
+     * 
+     * @param normalizedPath the normalized path to check
+     * @param normalizedPattern the normalized pattern to match against
+     * @return true if the path matches the directory pattern
+     */
+    private boolean matchesDirectoryPattern(String normalizedPath, String normalizedPattern) {
+        // Remove the trailing slash from the pattern
+        String dirPattern = normalizedPattern.substring(0, normalizedPattern.length() - 1);
+
+        // The path matches if it's exactly the directory or is a file within the directory
+        return normalizedPath.equals(dirPattern) || normalizedPath.startsWith(dirPattern + "/");
+    }
+
+    /**
+     * Checks if a path matches a glob pattern.
+     * 
+     * @param normalizedPath the normalized path to check
+     * @param normalizedPattern the normalized pattern to match against
+     * @return true if the path matches the glob pattern
+     */
+    private boolean matchesGlobPattern(String normalizedPath, String normalizedPattern) {
         try {
+            // Convert .gitignore-style pattern to Java glob pattern
+            String javaGlobPattern = convertToJavaGlob(normalizedPattern);
+
             // Create a glob pattern matcher
-            String globPattern = "glob:" + normalizedPattern;
+            String globPattern = "glob:" + javaGlobPattern;
             PathMatcher matcher = FileSystems.getDefault().getPathMatcher(globPattern);
 
-            // Try to match the path
-            try {
-                Path path = Path.of(normalizedPath);
-                if (matcher.matches(path)) {
-                    return true;
-                }
-            } catch (Exception e) {
-                // Ignore invalid paths
+            // Try to match the path directly
+            if (matchPath(matcher, normalizedPath)) {
+                return true;
             }
 
-            // Try with a leading slash
-            try {
-                Path path = Path.of("/" + normalizedPath);
-                if (matcher.matches(path)) {
-                    return true;
-                }
-            } catch (Exception e) {
-                // Ignore invalid paths
-            }
+            // Try with a leading slash (for absolute paths)
+            return matchPath(matcher, "/" + normalizedPath);
+
         } catch (Exception e) {
-            log.debug("Error matching path '{}' against pattern '{}': {}", filePath, pattern, e.getMessage());
+            log.debug("Error matching path '{}' against pattern '{}': {}", 
+                    normalizedPath, normalizedPattern, e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Converts a .gitignore-style pattern to a Java glob pattern.
+     * 
+     * @param pattern the .gitignore-style pattern
+     * @return the equivalent Java glob pattern
+     */
+    private String convertToJavaGlob(String pattern) {
+        // If extended glob is disabled, return the pattern as is
+        if (!extendedGlob) {
+            return pattern;
         }
 
-        return false;
+        // Handle ** pattern (match across directories)
+        // In .gitignore, ** matches zero or more directories
+        // In Java glob, ** does the same but needs special handling
+        StringBuilder result = new StringBuilder();
+        int i = 0;
+        while (i < pattern.length()) {
+            if (i < pattern.length() - 1 && pattern.charAt(i) == '*' && pattern.charAt(i + 1) == '*') {
+                // Handle ** pattern
+                if (i > 0 && pattern.charAt(i - 1) != '/') {
+                    result.append('/');
+                }
+                result.append("**");
+                if (i + 2 < pattern.length() && pattern.charAt(i + 2) != '/') {
+                    result.append('/');
+                }
+                i += 2;
+            } else {
+                // Copy character as is
+                result.append(pattern.charAt(i));
+                i++;
+            }
+        }
+
+        return result.toString();
+    }
+
+    /**
+     * Attempts to match a path against a PathMatcher.
+     * 
+     * @param matcher the PathMatcher to use
+     * @param pathStr the path string to match
+     * @return true if the path matches, false otherwise or if an error occurs
+     */
+    private boolean matchPath(PathMatcher matcher, String pathStr) {
+        try {
+            Path path = Path.of(pathStr);
+            return matcher.matches(path);
+        } catch (Exception e) {
+            // Ignore invalid paths
+            return false;
+        }
     }
 
     /**
