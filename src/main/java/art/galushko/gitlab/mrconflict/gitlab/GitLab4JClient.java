@@ -11,9 +11,9 @@ import org.gitlab4j.api.Constants.MergeRequestState;
 import org.gitlab4j.api.GitLabApi;
 import org.gitlab4j.api.GitLabApiException;
 import org.gitlab4j.api.models.*;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -207,12 +207,11 @@ public class GitLab4JClient implements GitLabClient {
         }
 
         executeWithRetry(
-                () -> gitLabApi.getNotesApi().createMergeRequestNote(projectId, mergeRequestIid, noteContent),
+                () -> gitLabApi.getNotesApi().createMergeRequestNote(projectId, mergeRequestIid, noteContent, new Date(), false),
                 "Failed to create note for MR " + mergeRequestIid
         );
     }
 
-    @NotNull
     private static String getMrCacheKey(Long projectId, Long mergeRequestIid) {
         return projectId + "_" + mergeRequestIid;
     }

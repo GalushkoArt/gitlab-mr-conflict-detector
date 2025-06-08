@@ -1,7 +1,6 @@
 package art.galushko.gitlab.mrconflict.model;
 
 import lombok.Builder;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -74,7 +73,6 @@ public record MergeRequestInfo(long id, String title, String sourceBranch, Strin
         return Objects.hash(id);
     }
 
-    @NotNull
     @Override
     public String toString() {
         return "MR" + id + "{" +

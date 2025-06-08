@@ -1,7 +1,6 @@
 package art.galushko.gitlab.mrconflict.model;
 
 import lombok.Builder;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;
 import java.util.Set;
@@ -34,7 +33,6 @@ public record MergeRequestConflict(MergeRequestInfo firstMr, MergeRequestInfo se
         return Objects.hash(firstMr, secondMr);
     }
 
-    @NotNull
     @Override
     public String toString() {
         return "MergeRequestConflict{" +

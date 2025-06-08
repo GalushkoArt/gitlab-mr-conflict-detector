@@ -1,6 +1,5 @@
 package art.galushko.gitlab.mrconflict.config;
 
-import lombok.Setter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -25,13 +24,16 @@ class ConfigLoaderTest {
     private final TestableConfigLoader configLoader = new TestableConfigLoader();
 
     // Subclass of ConfigLoader that allows us to override getEnvironmentVariables for testing
-    @Setter
     static class TestableConfigLoader extends ConfigLoader {
         private Map<String, String> environmentVariables = Collections.emptyMap();
 
         @Override
         protected Map<String, String> getEnvironmentVariables() {
             return environmentVariables;
+        }
+
+        public void setEnvironmentVariables(Map<String, String> environmentVariables) {
+            this.environmentVariables = environmentVariables;
         }
     }
 
