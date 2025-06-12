@@ -56,6 +56,9 @@ public class ServiceFactory {
      * @throws IllegalArgumentException if the provided configuration is null
      */
     public static synchronized void provideConfig(AppConfig config) {
+        if (config == null) {
+            throw new IllegalArgumentException("AppConfig must not be null");
+        }
         instance = new ServiceFactory(config);
     }
 
